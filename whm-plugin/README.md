@@ -1,6 +1,6 @@
 # Fail2Ban Manager - WHM Plugin
 
-Manage fail2ban jails, banned IPs, and whitelists from the WHM interface.
+Manage fail2ban jails, banned IPs, whitelists, and jail settings from the WHM web interface.
 
 ## Requirements
 
@@ -10,6 +10,9 @@ Manage fail2ban jails, banned IPs, and whitelists from the WHM interface.
 
 ## Install
 
+**Automatic:** The plugin is installed by `install.sh` when cPanel is detected.
+
+**Manual:**
 ```bash
 cd /root/fail2ban/whm-plugin
 ./install-whm-plugin.sh
@@ -18,6 +21,9 @@ systemctl restart cpanel
 
 ## Uninstall
 
+**Automatic:** The plugin is uninstalled by `uninstall.sh --purge`.
+
+**Manual:**
 ```bash
 cd /root/fail2ban/whm-plugin
 ./uninstall-whm-plugin.sh
@@ -25,12 +31,16 @@ cd /root/fail2ban/whm-plugin
 
 ## Features
 
-- **Status** – View fail2ban service and jail status
-- **Unban** – Unban an IP from a jail
-- **Ignore Countries** – Edit whitelisted countries (e.g. IN, US)
-- **Whitelist IPs** – Edit IP/CIDR whitelist, save and deploy
-- **Deploy** – Deploy config and restart fail2ban
-- **Update IP2Location** – Refresh GeoIP database
+| Feature | Description |
+|---------|-------------|
+| **Status** | View fail2ban service and per-jail stats |
+| **Jail settings** | Edit maxretry, findtime, bantime; Save & Deploy |
+| **Banned IPs** | Table with IP, country, banned time; per-IP Unban; AJAX refresh icon |
+| **Unban all whitelisted** | Bulk unban IPs from whitelisted countries |
+| **Ignore Countries** | Edit whitelisted country codes (e.g. IN, US) |
+| **Whitelist IPs** | Edit IP/CIDR whitelist, save and deploy |
+| **Deploy** | Deploy config and restart fail2ban |
+| **Update IP2Location** | Refresh GeoIP database |
 
 ## Location in WHM
 
