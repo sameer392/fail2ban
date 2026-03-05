@@ -1,6 +1,9 @@
-# Fail2Ban WordPress wp-login Protection
+# Fail2Ban Protection for cPanel/WHM
 
-Generic fail2ban configuration to block brute force attacks on `wp-login.php` across all WordPress sites on a cPanel/WHM server.
+Generic fail2ban configuration for cPanel/WHM servers. Includes:
+
+1. **wordpress-wp-login** – Block wp-login.php brute force (5+ requests in 5 min)
+2. **apache-high-volume** – Block high-volume traffic (500+ requests in 1 hour, excluding crawlers)
 
 ## Target Environment
 
@@ -46,9 +49,9 @@ Copies filter and jail to `/etc/fail2ban/` and restarts fail2ban.
 # Install fail2ban (CloudLinux / RHEL / CentOS)
 dnf install fail2ban fail2ban-systemd -y
 
-# Copy config
-cp /root/fail2ban/filter.d/wordpress-wp-login.conf /etc/fail2ban/filter.d/
-cp /root/fail2ban/jail.d/wordpress-wp-login.conf /etc/fail2ban/jail.d/
+# Copy config (all filters and jails)
+cp /root/fail2ban/filter.d/*.conf /etc/fail2ban/filter.d/
+cp /root/fail2ban/jail.d/*.conf /etc/fail2ban/jail.d/
 
 # Enable and start
 systemctl enable fail2ban
@@ -90,12 +93,40 @@ Attacker → Internet → Server
 | bantime   | 3600  | Ban duration in seconds (1 hour)     |
 | logpath   | `/usr/local/apache/domlogs/*/*` | All cPanel domain logs |
 
+### Jails and Filters
+
+| Jail | Filter | Purpose |
+|------|--------|---------|
+| wordpress-wp-login | wordpress-wp-login.conf | 5+ wp-login requests in 5 min |
+| apache-high-volume | apache-high-volume.conf | 500+ total requests in 1 hour (excludes crawlers) |
+
 ### Files
 
-| File | Location | Purpose |
-|------|----------|---------|
-| Filter | `filter.d/wordpress-wp-login.conf` | Regex to match wp-login requests |
-| Jail   | `jail.d/wordpress-wp-login.conf`   | Ban rules and log path             |
+| File | Purpose |
+|------|---------|
+| filter.d/wordpress-wp-login.conf | Match wp-login.php requests |
+| filter.d/apache-high-volume.conf | Match all requests, exclude crawlers (same logic as find_suspicious_ips.sh) |
+| jail.d/wordpress-wp-login.conf | wp-login ban rules |
+| jail.d/apache-high-volume.conf | High-volume ban rules (500/hour, 1hr ban) |
+| whitelist-ips.conf | Whitelisted IPs (excluded from bans) – edit and run update-whitelist.sh |
+
+### Whitelist IPs
+
+To exclude trusted IPs from bans (wp-login and high-volume jails):
+
+1. Edit `whitelist-ips.conf` – add one IP or CIDR per line:
+   ```
+   173.208.157.34/29
+   204.12.247.42/29
+   192.168.1.100
+   10.0.0.0/24
+   ```
+2. Run `./update-whitelist.sh` – regenerates filter ignoreregex
+3. Run `./setup.sh` – deploy and restart fail2ban
+
+Supported: single IPs, /24, /28, /29, /32. Other CIDRs fall back to single-IP match.
+
+---
 
 ### Optional: CSF integration
 
@@ -122,11 +153,13 @@ Then restart: `systemctl restart fail2ban`
 # Check all jails
 fail2ban-client status
 
-# Check WordPress jail
+# Check specific jail
 fail2ban-client status wordpress-wp-login
+fail2ban-client status apache-high-volume
 
 # List banned IPs
 fail2ban-client get wordpress-wp-login banip
+fail2ban-client get apache-high-volume banip
 
 # Unban an IP
 fail2ban-client set wordpress-wp-login unbanip <IP_ADDRESS>
@@ -146,8 +179,9 @@ ls /usr/local/apache/domlogs/*/* | head -5
 |---------------|----------------------------------------------------------------|
 | `install.sh`  | Full install: install package + deploy config + enable         |
 | `setup.sh`    | Deploy config only, restart fail2ban                           |
-| `status.sh`   | Show fail2ban and jail status                                  |
-| `uninstall.sh`| Remove config; use `--purge` to also uninstall fail2ban packages |
+| `status.sh`         | Show fail2ban and jail status                                  |
+| `update-whitelist.sh` | Regenerate filters from whitelist-ips.conf after adding IPs   |
+| `uninstall.sh`      | Remove config; use `--purge` to also uninstall fail2ban packages |
 
 All scripts must be run as root.
 
@@ -177,4 +211,13 @@ Use `fail2ban-client` for management. There is no standalone `fail2ban` command.
 
 ## Applicability
 
-This configuration works for **all** WordPress sites because every WordPress installation uses `wp-login.php`. The log path covers all cPanel domain logs, so every WordPress site on the server is protected.
+This configuration works for **all** sites on the server. The log path covers all cPanel domain logs.
+
+### High-volume jail caution
+
+The `apache-high-volume` jail bans IPs with 500+ requests per hour (excluding Google, Bing, Facebook bots). This may affect:
+- Legitimate users browsing many pages
+- API clients or CDN origins
+- Mobile apps with high request rates
+
+To disable: edit `/etc/fail2ban/jail.d/apache-high-volume.conf` and set `enabled = false`, then `systemctl restart fail2ban`.

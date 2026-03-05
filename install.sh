@@ -38,8 +38,8 @@ fi
 
 # 2. Deploy config
 echo "[2/5] Deploying config to /etc/fail2ban/..."
-cp -f "$CONFIG_DIR/filter.d/wordpress-wp-login.conf" /etc/fail2ban/filter.d/
-cp -f "$CONFIG_DIR/jail.d/wordpress-wp-login.conf" /etc/fail2ban/jail.d/
+cp -f "$CONFIG_DIR/filter.d/"*.conf /etc/fail2ban/filter.d/
+cp -f "$CONFIG_DIR/jail.d/"*.conf /etc/fail2ban/jail.d/
 echo "      Config deployed."
 
 # 3. Verify domlog path (informational)

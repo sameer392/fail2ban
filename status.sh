@@ -19,11 +19,18 @@ else
 fi
 
 echo
-echo "=== Jail: wordpress-wp-login ==="
-fail2ban-client status wordpress-wp-login 2>/dev/null || echo "Jail not found or not active."
+echo "=== Jails ==="
+for jail in wordpress-wp-login apache-high-volume; do
+  if fail2ban-client status "$jail" &>/dev/null; then
+    echo "--- $jail ---"
+    fail2ban-client status "$jail"
+    echo
+  fi
+done
 
 echo
 echo "=== Quick commands ==="
-echo "  fail2ban-client get wordpress-wp-login banip   # List banned IPs"
-echo "  fail2ban-client set wordpress-wp-login unbanip <IP>  # Unban IP"
+echo "  fail2ban-client get wordpress-wp-login banip   # List wp-login banned IPs"
+echo "  fail2ban-client get apache-high-volume banip  # List high-volume banned IPs"
+echo "  fail2ban-client set <jail> unbanip <IP>       # Unban IP"
 echo "  tail -f /var/log/fail2ban.log                 # Monitor log"

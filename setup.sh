@@ -25,8 +25,8 @@ echo "=== Fail2Ban WordPress wp-login - Setup (config deploy) ==="
 echo
 
 echo "[1/2] Deploying config to /etc/fail2ban/..."
-cp -f "$CONFIG_DIR/filter.d/wordpress-wp-login.conf" /etc/fail2ban/filter.d/
-cp -f "$CONFIG_DIR/jail.d/wordpress-wp-login.conf" /etc/fail2ban/jail.d/
+cp -f "$CONFIG_DIR/filter.d/"*.conf /etc/fail2ban/filter.d/
+cp -f "$CONFIG_DIR/jail.d/"*.conf /etc/fail2ban/jail.d/
 echo "      Config deployed."
 
 echo "[2/2] Restarting fail2ban..."
@@ -34,6 +34,6 @@ systemctl restart fail2ban
 echo "      Done."
 
 echo
-fail2ban-client status wordpress-wp-login
+fail2ban-client status
 echo
 echo "=== Setup complete ==="
