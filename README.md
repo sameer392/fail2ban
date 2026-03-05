@@ -181,6 +181,8 @@ With `loglevel = DEBUG` (from `fail2ban.d/loglevel-verbose.conf`), you'll see:
 - `Unban <ip>` – IP unbanned
 To reduce log volume, remove `/etc/fail2ban/fail2ban.d/loglevel-verbose.conf` and restart fail2ban.
 
+**Log rotation** – The install deploys `/etc/logrotate.d/fail2ban` to rotate `/var/log/fail2ban.log` when it reaches 50MB (or weekly), keeping 4 compressed archives. If the log has grown large, run `logrotate --force /etc/logrotate.d/fail2ban` to rotate immediately.
+
 ---
 
 ## Shell Scripts

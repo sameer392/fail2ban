@@ -26,7 +26,7 @@ if [ "$SCRIPT_SRC" != "$INSTALL_DIR" ]; then
    for d in filter.d jail.d action.d fail2ban.d scripts whm-plugin; do
       [ -d "$SCRIPT_SRC/$d" ] && cp -r "$SCRIPT_SRC/$d" "$INSTALL_DIR/"
    done
-   for f in install.sh setup.sh uninstall.sh update-whitelist.sh status.sh whitelist-ips.conf; do
+   for f in install.sh setup.sh uninstall.sh update-whitelist.sh status.sh whitelist-ips.conf fail2ban-logrotate; do
       [ -f "$SCRIPT_SRC/$f" ] && cp -f "$SCRIPT_SRC/$f" "$INSTALL_DIR/"
    done
    echo "      Source installed. You may remove $SCRIPT_SRC after this."
@@ -60,6 +60,7 @@ mkdir -p /etc/fail2ban/scripts
 [ -f "$CONFIG_DIR/scripts/ignore-countries.conf" ] && cp -f "$CONFIG_DIR/scripts/ignore-countries.conf" /etc/fail2ban/scripts/
 [ -f "$CONFIG_DIR/scripts/setup-ip2location.sh" ] && cp -f "$CONFIG_DIR/scripts/setup-ip2location.sh" /etc/fail2ban/scripts/ && chmod +x /etc/fail2ban/scripts/setup-ip2location.sh
 [ -f "$CONFIG_DIR/scripts/update-ip2location.sh" ] && cp -f "$CONFIG_DIR/scripts/update-ip2location.sh" /etc/fail2ban/scripts/ && chmod +x /etc/fail2ban/scripts/update-ip2location.sh
+[ -f "$CONFIG_DIR/fail2ban-logrotate" ] && cp -f "$CONFIG_DIR/fail2ban-logrotate" /etc/logrotate.d/fail2ban && echo "      Logrotate config installed."
 echo "      Config deployed."
 
 # 3. Install libmaxminddb (for IP2Location country lookup via mmdblookup)

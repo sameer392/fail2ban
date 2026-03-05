@@ -98,7 +98,8 @@ if [[ "$PURGE" == true ]]; then
       echo "      WHM plugin uninstall script not found."
    fi
    echo
-   echo "[6/6] Removing /etc/fail2ban/ and /usr/share/fail2ban/ (custom config)..."
+   echo "[6/6] Removing /etc/fail2ban/, logrotate config, and /usr/share/fail2ban/ (custom config)..."
+   rm -f /etc/logrotate.d/fail2ban 2>/dev/null && echo "      /etc/logrotate.d/fail2ban removed." || true
    if [[ -d /etc/fail2ban ]]; then
       rm -rf /etc/fail2ban
       echo "      /etc/fail2ban/ removed."
