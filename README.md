@@ -3,7 +3,7 @@
 Generic fail2ban configuration for cPanel/WHM servers. Includes:
 
 1. **wordpress-wp-login** – Block wp-login.php brute force (5+ requests in 5 min)
-2. **apache-high-volume** – Block high-volume traffic (500+ requests in 1 hour, excluding crawlers)
+2. **apache-high-volume** – Block high-volume traffic (100+ requests in 10 min, excluding crawlers)
 
 ## Target Environment
 
@@ -102,7 +102,7 @@ Attacker → Internet → Server
 | Jail | Filter | Purpose |
 |------|--------|---------|
 | wordpress-wp-login | wordpress-wp-login.conf | 5+ wp-login requests in 5 min |
-| apache-high-volume | apache-high-volume.conf | 500+ total requests in 1 hour (excludes crawlers) |
+| apache-high-volume | apache-high-volume.conf | 100+ requests in 10 min (excludes crawlers) |
 
 ### Files
 
@@ -111,7 +111,7 @@ Attacker → Internet → Server
 | filter.d/wordpress-wp-login.conf | Match wp-login.php requests |
 | filter.d/apache-high-volume.conf | Match all requests, exclude crawlers (same logic as find_suspicious_ips.sh) |
 | jail.d/wordpress-wp-login.conf | wp-login ban rules |
-| jail.d/apache-high-volume.conf | High-volume ban rules (500/hour, 1hr ban) |
+| jail.d/apache-high-volume.conf | High-volume ban rules (100/10min, 1hr ban) |
 | action.d/csf-domain.conf | Custom CSF action (jail + domain in comment) |
 | scripts/csf-ban.sh | Helper: adds IP to csf.deny with affected domain(s) (deployed to /etc/fail2ban/scripts/) |
 | fail2ban.d/loglevel-verbose.conf | Optional: DEBUG loglevel for IP monitoring (failures, bans) in /var/log/fail2ban.log |
@@ -220,7 +220,7 @@ This configuration works for **all** sites on the server. The log path covers al
 
 ### High-volume jail caution
 
-The `apache-high-volume` jail bans IPs with 500+ requests per hour (excluding Google, Bing, Facebook bots). This may affect:
+The `apache-high-volume` jail bans IPs with 100+ requests per 10 minutes (excluding Google, Bing, Facebook bots). This may affect:
 - Legitimate users browsing many pages
 - API clients or CDN origins
 - Mobile apps with high request rates
