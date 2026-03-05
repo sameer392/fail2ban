@@ -30,7 +30,7 @@ echo
 BACKUP_DIR="/etc/fail2ban/backups"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
-echo "[1/3] Backing up current config..."
+echo "[1/4] Backing up current config..."
 mkdir -p "$BACKUP_DIR"
 BKP="$BACKUP_DIR/$TIMESTAMP"
 mkdir -p "$BKP/filter.d" "$BKP/jail.d" "$BKP/fail2ban.d" "$BKP/scripts"
@@ -51,7 +51,7 @@ echo "      Backup: $BKP"
 # Keep last 10 backups
 ls -dt "$BACKUP_DIR"/[0-9]*-[0-9]* 2>/dev/null | tail -n +11 | xargs -r rm -rf
 
-echo "[2/3] Deploying config to /etc/fail2ban/..."
+echo "[2/4] Deploying config to /etc/fail2ban/..."
 cp -f "$CONFIG_DIR/filter.d/"*.conf /etc/fail2ban/filter.d/
 cp -f "$CONFIG_DIR/jail.d/"*.conf /etc/fail2ban/jail.d/
 [ -f "$CONFIG_DIR/action.d/csf-domain.conf" ] && cp -f "$CONFIG_DIR/action.d/csf-domain.conf" /etc/fail2ban/action.d/
@@ -65,11 +65,11 @@ mkdir -p /etc/fail2ban/scripts
 echo "      Config deployed."
 
 if [ -x /usr/local/cpanel/bin/register_appconfig ] && [ -f "$CONFIG_DIR/whm-plugin/install-whm-plugin.sh" ]; then
-   echo "[2b/3] Installing WHM plugin..."
+   echo "[3/4] Installing WHM plugin..."
    (cd "$CONFIG_DIR/whm-plugin" && ./install-whm-plugin.sh) || echo "      WHM plugin install skipped or failed."
 fi
 
-echo "[3/3] Restarting fail2ban..."
+echo "[4/4] Restarting fail2ban..."
 systemctl restart fail2ban
 # Wait for fail2ban socket to be ready (avoid "Failed to access socket" on quick re-runs)
 for i in {1..10}; do
