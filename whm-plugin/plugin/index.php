@@ -125,6 +125,41 @@ function get_ban_times($jail) {
     return $times;
 }
 
+function get_bans_last_24h() {
+    $db = '/var/lib/fail2ban/fail2ban.sqlite3';
+    $result = [];
+    if (!file_exists($db) || !is_readable($db)) return $result;
+    $out = [];
+    exec("sqlite3 -separator '|' " . escapeshellarg($db) . " \"SELECT jail, count(*) FROM bans WHERE timeofban > strftime('%s','now') - 86400 GROUP BY jail\" 2>/dev/null", $out, $ret);
+    if ($ret !== 0) return $result;
+    foreach ($out as $line) {
+        $p = explode('|', $line, 2);
+        if (count($p) === 2) $result[trim($p[0])] = (int)trim($p[1]);
+    }
+    return $result;
+}
+
+function get_current_loglevel() {
+    $path = '/etc/fail2ban/fail2ban.d/loglevel-verbose.conf';
+    if (!is_readable($path)) return 'WARNING';
+    $c = file_get_contents($path);
+    if (preg_match('/loglevel\s*=\s*(\w+)/', $c, $m)) return strtoupper(trim($m[1]));
+    return 'WARNING';
+}
+
+function save_loglevel($level) {
+    $level = strtoupper(preg_replace('/[^A-Za-z]/', '', $level));
+    if (!in_array($level, ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], true)) return false;
+    $content = "# Log level override - set via WHM plugin\n[DEFAULT]\nloglevel = $level\n";
+    $paths = ['/etc/fail2ban/fail2ban.d/loglevel-verbose.conf'];
+    if (is_dir('/usr/share/fail2ban/fail2ban.d')) $paths[] = '/usr/share/fail2ban/fail2ban.d/loglevel-verbose.conf';
+    foreach ($paths as $p) {
+        $dir = dirname($p);
+        if (is_dir($dir) && is_writable($dir)) file_put_contents($p, $content);
+    }
+    return true;
+}
+
 function get_jail_settings($jail) {
     $jail = preg_replace('/[^a-zA-Z0-9_-]/', '', $jail);
     $paths = ['/usr/share/fail2ban/jail.d/' . $jail . '.conf', '/etc/fail2ban/jail.d/' . $jail . '.conf'];
@@ -277,6 +312,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
         } else {
             $msg = "Invalid jail.";
         }
+    } elseif ($action === 'save_loglevel') {
+        $level = $_POST['loglevel'] ?? 'WARNING';
+        if (save_loglevel($level)) {
+            exec('/usr/share/fail2ban/setup.sh 2>&1', $out, $ret);
+            $msg = $ret === 0 ? "Log level set to $level and fail2ban restarted." : "Log level saved; restart failed: " . implode("\n", $out);
+        } else {
+            $msg = "Invalid log level.";
+        }
+    } elseif ($action === 'save_email_alerts') {
+        $conf = '/etc/fail2ban/scripts/email-alerts.conf';
+        $email = trim($_POST['email_alerts_to'] ?? '');
+        $threshold = max(1, min(100, (int)($_POST['email_alerts_threshold'] ?? 1)));
+        if ($email === '') {
+            if (file_exists($conf) && is_writable($conf)) {
+                file_put_contents($conf, "# Email alerts disabled - leave EMAIL_TO empty\nEMAIL_TO=\nEMAIL_THRESHOLD=1\n");
+                $msg = "Email alerts disabled.";
+            }
+        } else {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) && (is_dir('/etc/fail2ban/scripts') || @mkdir('/etc/fail2ban/scripts', 0755, true))) {
+                $content = "# Email on ban - configured via WHM\n# Send when ban occurs (optional threshold: min failed count)\nEMAIL_TO=$email\nEMAIL_THRESHOLD=$threshold\n";
+                if (file_put_contents($conf, $content) !== false) $msg = "Email alerts saved. Notifications will be sent to $email.";
+                else $msg = "Could not write email-alerts.conf.";
+            } else $msg = "Invalid email address.";
+        }
     }
 }
 
@@ -305,6 +364,16 @@ function is_geoip_ready() {
 }
 
 $geoip_ready = is_geoip_ready();
+$bans_24h = get_bans_last_24h();
+$current_loglevel = get_current_loglevel();
+$email_alerts_to = '';
+$email_alerts_threshold = 1;
+$email_conf = '/etc/fail2ban/scripts/email-alerts.conf';
+if (file_exists($email_conf) && is_readable($email_conf)) {
+    $ec = file_get_contents($email_conf);
+    if (preg_match('/EMAIL_TO\s*=\s*(.+)$/m', $ec, $m)) $email_alerts_to = trim($m[1]);
+    if (preg_match('/EMAIL_THRESHOLD\s*=\s*(\d+)/', $ec, $m)) $email_alerts_threshold = max(1, (int)$m[1]);
+}
 $jails = ['wordpress-wp-login', 'apache-high-volume'];
 $jail_labels = [
     'wordpress-wp-login' => ['failed' => 'Failed logins', 'failed_total' => 'Total failed logins'],
@@ -384,6 +453,13 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
 <div class="col-md-8">
 
 <h3>Status</h3>
+<?php
+$total_24h = array_sum($bans_24h);
+if ($total_24h > 0): $parts = [];
+foreach ($jails as $j) { $c = $bans_24h[$j] ?? 0; if ($c > 0) $parts[] = htmlspecialchars($j) . ': ' . $c; }
+?>
+<p class="text-muted"><strong>Last 24h bans:</strong> <?php echo implode(', ', $parts); ?> — total <?php echo $total_24h; ?></p>
+<?php endif; ?>
 <pre style="background:#f5f5f5;padding:10px;font-size:12px;"><?php echo htmlspecialchars($general_status); ?></pre>
 
 <h3>Jails</h3>
@@ -512,6 +588,29 @@ $js = $jail_settings[$j] ?? ['maxretry' => 5, 'findtime' => 300, 'bantime' => 36
   <input type="hidden" name="action" value="save_whitelist_ips">
   <textarea name="whitelist_ips" class="form-control" rows="8" style="font-family:monospace;font-size:12px;"><?php echo htmlspecialchars($whitelist_ips); ?></textarea>
   <button type="submit" class="btn btn-primary btn-sm" style="margin-top:5px;">Save &amp; Deploy</button>
+</form>
+
+<h3 style="margin-top:20px;">Log Level</h3>
+<p class="text-muted" style="font-size:12px;">Verbosity of /var/log/fail2ban.log (INFO=more detail, WARNING=less).</p>
+<form method="post" class="form-inline">
+  <input type="hidden" name="action" value="save_loglevel">
+  <select name="loglevel" class="form-control input-sm" style="width:120px;">
+    <option value="DEBUG"<?php echo $current_loglevel === 'DEBUG' ? ' selected' : ''; ?>>DEBUG</option>
+    <option value="INFO"<?php echo $current_loglevel === 'INFO' ? ' selected' : ''; ?>>INFO</option>
+    <option value="WARNING"<?php echo $current_loglevel === 'WARNING' ? ' selected' : ''; ?>>WARNING</option>
+    <option value="ERROR"<?php echo $current_loglevel === 'ERROR' ? ' selected' : ''; ?>>ERROR</option>
+    <option value="CRITICAL"<?php echo $current_loglevel === 'CRITICAL' ? ' selected' : ''; ?>>CRITICAL</option>
+  </select>
+  <button type="submit" class="btn btn-primary btn-sm" style="margin-left:6px;">Apply</button>
+</form>
+
+<h3 style="margin-top:20px;">Email Alerts</h3>
+<p class="text-muted" style="font-size:12px;">Optional: receive email when an IP is banned. Leave empty to disable.</p>
+<form method="post">
+  <input type="hidden" name="action" value="save_email_alerts">
+  <input type="email" name="email_alerts_to" value="<?php echo htmlspecialchars($email_alerts_to); ?>" class="form-control input-sm" placeholder="admin@example.com" style="width:220px;margin-bottom:4px;">
+  <span class="text-muted" style="font-size:11px;">Threshold: </span><input type="number" name="email_alerts_threshold" value="<?php echo (int)$email_alerts_threshold; ?>" min="1" max="100" style="width:50px;" title="Min failed attempts before sending alert"> <span class="text-muted" style="font-size:11px;">failed attempts</span>
+  <button type="submit" class="btn btn-default btn-sm" style="margin-top:6px;display:block;">Save</button>
 </form>
 
 <h3 style="margin-top:20px;">Actions</h3>

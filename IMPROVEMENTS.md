@@ -40,19 +40,16 @@ Recommendations for enhancing usability, reliability, and functionality.
 
 ---
 
-## 3. Monitoring & Observability
+## 3. Monitoring & Observability ✅ (Completed)
 
-### 3.1 Dashboard stats
-**Current:** WHM plugin shows per-jail counts (failed, banned).  
-**Improvement:** Add simple charts (e.g. bans over time) and a "Last 24h bans" summary using fail2ban.log or SQLite.
+### 3.1 Dashboard stats ✅
+**Done:** Added "Last 24h bans" summary above Status using fail2ban SQLite `bans` table. Shows per-jail counts and total for the last 24 hours.
 
-### 3.2 Email alerts for bans
-**Current:** No built-in email notification.  
-**Improvement:** Optional config to send email (or use `fail2ban-sendmail`) when high-value IPs are banned or when a threshold is reached.
+### 3.2 Email alerts for bans ✅
+**Done:** Optional email alerts via WHM plugin. Configure `email-alerts.conf` (EMAIL_TO, EMAIL_THRESHOLD) in UI. csf-ban.sh sends mail via `mail`/`mailx`/`sendmail` when an IP is banned.
 
-### 3.3 Log level toggle in UI
-**Current:** Loglevel is set in `loglevel-verbose.conf` and requires manual edit + restart.  
-**Improvement:** Add a dropdown in the WHM plugin (INFO/WARNING/ERROR) and apply changes via config update + restart.
+### 3.3 Log level toggle in UI ✅
+**Done:** Dropdown in WHM plugin (DEBUG/INFO/WARNING/ERROR/CRITICAL). Writes to fail2ban.d/loglevel-verbose.conf, runs setup.sh to restart.
 
 ---
 

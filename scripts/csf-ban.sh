@@ -62,3 +62,20 @@ fi
 
 COMMENT=$(echo "$COMMENT" | head -c 200)
 /usr/sbin/csf -d "$IP" "$COMMENT"
+
+# Optional: send email alert on ban
+EMAIL_CONF="${SCRIPT_DIR}/email-alerts.conf"
+if [ -f "$EMAIL_CONF" ] && [ -r "$EMAIL_CONF" ]; then
+    . "$EMAIL_CONF"
+    if [ -n "$EMAIL_TO" ] && [ "$EMAIL_TO" != "none" ]; then
+        SUBJ="[Fail2Ban] $IP banned ($JAIL)"
+        BODY="IP $IP was banned by Fail2Ban (jail: $JAIL). Domains: ${DOMAINS:--}. $(date)"
+        if command -v mail &>/dev/null; then
+            echo "$BODY" | mail -s "$SUBJ" "$EMAIL_TO" 2>/dev/null
+        elif command -v mailx &>/dev/null; then
+            echo "$BODY" | mailx -s "$SUBJ" "$EMAIL_TO" 2>/dev/null
+        elif [ -x /usr/sbin/sendmail ]; then
+            printf 'To: %s\nSubject: %s\n\n%s\n' "$EMAIL_TO" "$SUBJ" "$BODY" | /usr/sbin/sendmail -t 2>/dev/null
+        fi
+    fi
+fi
