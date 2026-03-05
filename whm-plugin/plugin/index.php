@@ -23,6 +23,33 @@ function checkacl($acl) {
     return false;
 }
 
+function get_ip_country($ip, &$cache = []) {
+    if (isset($cache[$ip])) return $cache[$ip];
+    if (preg_match('/^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|::1|fc00:|fe80:)/', $ip)) {
+        return $cache[$ip] = '-';
+    }
+    $country = '';
+    $db = '/etc/fail2ban/GeoIP/IP2LOCATION-LITE-DB1.mmdb';
+    if (file_exists($db)) {
+        $out = [];
+        exec("mmdblookup -f " . escapeshellarg($db) . " -i " . escapeshellarg($ip) . " country iso_code 2>/dev/null", $out, $ret);
+        if ($ret === 0 && preg_match('/"([A-Z]{2})"/', implode(' ', $out), $m)) $country = $m[1];
+    }
+    if ($country === '') {
+        if (function_exists('file_get_contents') && ini_get('allow_url_fopen')) {
+            $json = @file_get_contents("http://ip-api.com/json/" . urlencode($ip) . "?fields=countryCode", false, stream_context_create(['http' => ['timeout' => 2]]));
+            if ($json && preg_match('/"countryCode":"([A-Z]{2})"/', $json, $m)) $country = $m[1];
+        } elseif (function_exists('curl_init')) {
+            $ch = curl_init("http://ip-api.com/json/" . urlencode($ip) . "?fields=countryCode");
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2]);
+            $json = @curl_exec($ch);
+            curl_close($ch);
+            if ($json && preg_match('/"countryCode":"([A-Z]{2})"/', $json, $m)) $country = $m[1];
+        }
+    }
+    return $cache[$ip] = ($country ?: '-');
+}
+
 function parse_jail_status($jail) {
     $data = ['active' => false, 'currently_failed' => '-', 'total_failed' => '-', 'currently_banned' => '-', 'total_banned' => '-', 'banned_ips' => []];
     exec("fail2ban-client status " . escapeshellarg($jail) . " 2>/dev/null", $out, $ret);
@@ -160,12 +187,13 @@ $d = $jail_data[$j];
     <?php if (!empty($d['banned_ips'])): ?>
     <p><strong>Banned IPs:</strong></p>
     <table class="table table-bordered table-striped table-condensed">
-      <thead><tr><th>#</th><th>IP Address</th><th>Action</th></tr></thead>
+      <thead><tr><th>#</th><th>IP Address</th><th>Country</th><th>Action</th></tr></thead>
       <tbody>
-      <?php foreach (array_values($d['banned_ips']) as $i => $ip): ?>
+      <?php $country_cache = []; foreach (array_values($d['banned_ips']) as $i => $ip): $country = get_ip_country($ip, $country_cache); ?>
         <tr>
           <td><?php echo $i + 1; ?></td>
           <td><code><?php echo htmlspecialchars($ip); ?></code></td>
+          <td><?php echo htmlspecialchars($country); ?></td>
           <td>
             <form method="post" style="display:inline;margin:0;">
               <input type="hidden" name="action" value="unban">
