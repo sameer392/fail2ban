@@ -33,30 +33,33 @@ fi
 
 echo "Downloading IP2Location LITE DB1 (MMDB)..."
 
-# Try token-based download first (DB1 LITE MMDB)
 ZIP="/tmp/IP2LOCATION-LITE-DB1.MMDB.ZIP"
-DOWNLOADED=0
+is_valid_zip() {
+    [ -s "$1" ] && [ "$(head -c 2 "$1" | od -An -tx1 | tr -d ' \n')" = "504b" ]
+}
+download_and_validate() {
+    local url="$1"
+    rm -f "$ZIP"
+    curl -sLf -o "$ZIP" "$url" 2>/dev/null && is_valid_zip "$ZIP"
+}
 
-for FILE_CODE in DB1LITEMMDB DB1LITE.MMDB; do
-    if curl -sL -f -o "$ZIP" "https://www.ip2location.com/download?token=${TOKEN}&file=${FILE_CODE}" 2>/dev/null && [ -s "$ZIP" ]; then
-        if file "$ZIP" | grep -qi zip; then
-            DOWNLOADED=1
+# Prefer direct LITE mirror (no token); fallback to token-based
+if ! download_and_validate "https://download.ip2location.com/lite/IP2LOCATION-LITE-DB1.MMDB.ZIP"; then
+    echo "Direct mirror failed, trying token-based download..."
+    for FILE_CODE in DB1LITEMMDB DB1LITE.MMDB; do
+        if download_and_validate "https://www.ip2location.com/download?token=${TOKEN}&file=${FILE_CODE}"; then
             break
         fi
-    fi
-    rm -f "$ZIP"
-done
-
-# Fallback: direct LITE mirror (no token, free)
-if [ "$DOWNLOADED" -eq 0 ]; then
-    echo "Token download failed, trying direct LITE mirror..."
-    if curl -sLf -o "$ZIP" "https://download.ip2location.com/lite/IP2LOCATION-LITE-DB1.MMDB.ZIP" 2>/dev/null && [ -s "$ZIP" ]; then
-        DOWNLOADED=1
-    fi
+    done
 fi
 
-if [ "$DOWNLOADED" -eq 0 ]; then
-    echo "Failed to download database. Check token or network."
+if ! is_valid_zip "$ZIP"; then
+    if [ -s "$ZIP" ] && head -c 80 "$ZIP" | grep -qi "ONLY BE DOWNLOADED"; then
+        echo "IP2Location rate limit: 5 downloads per 24h per IP. Wait or use a different IP."
+    else
+        echo "Failed to download valid database. Check network or set IP2LOCATION_TOKEN."
+    fi
+    rm -f "$ZIP"
     exit 1
 fi
 
@@ -65,7 +68,7 @@ TMPDIR=$(mktemp -d)
 unzip -q -o "$ZIP" -d "$TMPDIR"
 rm -f "$ZIP"
 
-MMDB=$(find "$TMPDIR" -name "*.mmdb" -type f | head -1)
+MMDB=$(find "$TMPDIR" -iname "*.mmdb" -type f | head -1)
 if [ -n "$MMDB" ]; then
     install -m 644 "$MMDB" "$DB_DIR/IP2LOCATION-LITE-DB1.mmdb"
     echo "Installed to $DB_DIR/IP2LOCATION-LITE-DB1.mmdb"
