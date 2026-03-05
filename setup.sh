@@ -64,6 +64,11 @@ mkdir -p /etc/fail2ban/scripts
 [ -f "$CONFIG_DIR/fail2ban-logrotate" ] && cp -f "$CONFIG_DIR/fail2ban-logrotate" /etc/logrotate.d/fail2ban
 echo "      Config deployed."
 
+if [ -x /usr/local/cpanel/bin/register_appconfig ] && [ -f "$CONFIG_DIR/whm-plugin/install-whm-plugin.sh" ]; then
+   echo "[2b/3] Installing WHM plugin..."
+   (cd "$CONFIG_DIR/whm-plugin" && ./install-whm-plugin.sh) || echo "      WHM plugin install skipped or failed."
+fi
+
 echo "[3/3] Restarting fail2ban..."
 systemctl restart fail2ban
 # Wait for fail2ban socket to be ready (avoid "Failed to access socket" on quick re-runs)
