@@ -7,7 +7,7 @@
 
 set -e
 
-CONFIG_DIR="/root/fail2ban-config"
+CONFIG_DIR="/root/fail2ban"
 
 # Check root
 if [[ $EUID -ne 0 ]]; then

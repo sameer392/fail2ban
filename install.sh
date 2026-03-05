@@ -7,7 +7,7 @@
 
 set -e
 
-CONFIG_DIR="/root/fail2ban-config"
+CONFIG_DIR="/root/fail2ban"
 F2B_FILTER="/etc/fail2ban/filter.d/wordpress-wp-login.conf"
 F2B_JAIL="/etc/fail2ban/jail.d/wordpress-wp-login.conf"
 

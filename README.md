@@ -15,7 +15,7 @@ Generic fail2ban configuration to block brute force attacks on `wp-login.php` ac
 ### Option 1: Full installation (fail2ban not yet installed)
 
 ```bash
-cd /root/fail2ban-config
+cd /root/fail2ban
 ./install.sh
 ```
 
@@ -24,7 +24,7 @@ Installs fail2ban, deploys config to `/etc/fail2ban/`, enables and starts the se
 ### Option 2: Deploy config only (fail2ban already installed)
 
 ```bash
-cd /root/fail2ban-config
+cd /root/fail2ban
 ./setup.sh
 ```
 
@@ -37,8 +37,8 @@ Copies filter and jail to `/etc/fail2ban/` and restarts fail2ban.
 dnf install fail2ban fail2ban-systemd -y
 
 # Copy config
-cp /root/fail2ban-config/filter.d/wordpress-wp-login.conf /etc/fail2ban/filter.d/
-cp /root/fail2ban-config/jail.d/wordpress-wp-login.conf /etc/fail2ban/jail.d/
+cp /root/fail2ban/filter.d/wordpress-wp-login.conf /etc/fail2ban/filter.d/
+cp /root/fail2ban/jail.d/wordpress-wp-login.conf /etc/fail2ban/jail.d/
 
 # Enable and start
 systemctl enable fail2ban
