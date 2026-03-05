@@ -30,6 +30,16 @@ cd /root/fail2ban
 
 Copies filter and jail to `/etc/fail2ban/` and restarts fail2ban.
 
+### Uninstall
+
+```bash
+# Remove only the WordPress wp-login jail (keep fail2ban)
+./uninstall.sh
+
+# Remove config AND uninstall fail2ban packages
+./uninstall.sh --purge
+```
+
 ### Option 3: Manual installation
 
 ```bash
@@ -132,11 +142,12 @@ ls /usr/local/apache/domlogs/*/* | head -5
 
 ## Shell Scripts
 
-| Script       | Purpose                                              |
-|--------------|------------------------------------------------------|
-| `install.sh` | Full install: install package + deploy config + enable |
-| `setup.sh`   | Deploy config only, restart fail2ban                 |
-| `status.sh`  | Show fail2ban and jail status                        |
+| Script        | Purpose                                                        |
+|---------------|----------------------------------------------------------------|
+| `install.sh`  | Full install: install package + deploy config + enable         |
+| `setup.sh`    | Deploy config only, restart fail2ban                           |
+| `status.sh`   | Show fail2ban and jail status                                  |
+| `uninstall.sh`| Remove config; use `--purge` to also uninstall fail2ban packages |
 
 All scripts must be run as root.
 
