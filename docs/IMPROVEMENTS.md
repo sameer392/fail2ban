@@ -57,7 +57,7 @@ To-do items for enhancing usability, reliability, and functionality.
 **Improvement:** Add `healthcheck.sh` that verifies: fail2ban running, jails enabled, log path exists, GeoIP present (if configured), and returns appropriate exit codes (0=ok, 1=fail) for monitoring systems (Nagios, Uptime Kuma, etc.).
 
 ### 3.3 Upgrade path documentation
-**Current:** Updates are done by re-running setup or reinstalling; no formal upgrade doc.  
+**Current:** Updates are done by re-running update or reinstalling; no formal upgrade doc.  
 **Improvement:** Document upgrade steps (e.g. backup → pull/copy new files → update.sh) and any config migrations in README or UPGRADE.md.
 
 ### 3.4 Expand status.sh to include dynamic jails
