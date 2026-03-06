@@ -1,131 +1,103 @@
 # Suggested Improvements for Fail2Ban cPanel/WHM
 
-Recommendations for enhancing usability, reliability, and functionality.
+To-do items for enhancing usability, reliability, and functionality.
 
 ---
 
-## 1. Usability & UX ✅ (Completed)
+## 1. Functionality
 
-### 1.1 WHM Plugin – Add helper text for time fields ✅
-**Current:** `findtime` and `bantime` show raw seconds (e.g. 300, 3600).  
-**Done:** Added preset dropdowns: findtime (1 min, 5 min, 10 min, 1 hr), bantime (5 min, 1 hr, 24 hr, 1 week).
-
-### 1.2 WHM Plugin – Show affected domains per ban ✅
-**Current:** Banned IPs table shows IP, country, banned time.  
-**Done:** Added "Affected Domains" column from csf.deny comment or domlog lookup.
-
-### 1.3 WHM Plugin – Bulk unban from table ✅
-**Current:** Must unban IPs one by one.  
-**Done:** Added row checkboxes, "Select all", and "Unban selected" button.
-
-### 1.4 WHM Plugin – Dark/light theme consistency ✅
-**Current:** UI uses WHM styles; may not match all themes.  
-**Done:** Added .fail2ban-manager wrapper and theme-aware CSS with var() fallbacks.
-
----
-
-## 2. Reliability & Safety ✅ (Completed)
-
-### 2.1 Backup before deploy ✅
-**Done:** setup.sh creates timestamped backup in `/etc/fail2ban/backups/YYYYMMDD-HHMMSS/` before deploying. Keeps last 10 backups. Added `restore-backup.sh` to restore from backup.
-
-### 2.2 Validation of jail settings in UI ✅
-**Done:** Added client-side validation on form submit. Shows inline error with allowed ranges (maxretry 1-10000, findtime 60-2592000, bantime 60-31536000). HTML5 required and min/max attributes.
-
-### 2.3 Idempotent install ✅
-**Done:** install.sh uses `copy_if_changed()` (cmp) to only copy files when content differs. Reports "Source unchanged (already up to date)" when nothing changed.
-
-### 2.4 Graceful handling of missing GeoIP ✅
-**Done:** WHM plugin checks `is_geoip_ready()` (mmdb exists and mmdblookup works). Shows warning alert with setup-ip2location.sh instructions when not configured.
-
----
-
-## 3. Monitoring & Observability ✅ (Completed)
-
-### 3.1 Dashboard stats ✅
-**Done:** Added "Last 24h bans" summary above Status using fail2ban SQLite `bans` table. Shows per-jail counts and total for the last 24 hours.
-
-### 3.2 Email alerts for bans ✅
-**Done:** Optional email alerts via WHM plugin. Configure `email-alerts.conf` (EMAIL_TO, EMAIL_THRESHOLD) in UI. csf-ban.sh sends mail via `mail`/`mailx`/`sendmail` when an IP is banned.
-
-### 3.3 Log level toggle in UI ✅
-**Done:** Dropdown in WHM plugin (DEBUG/INFO/WARNING/ERROR/CRITICAL). Writes to fail2ban.d/loglevel-verbose.conf, runs setup.sh to restart.
-
----
-
-## 4. Functionality
-
-### 4.1 Additional jails (XML-RPC, exploit probes)
-**Current:** Only wp-login and high-volume.  
+### 1.1 Additional jails (XML-RPC, exploit probes)
+**Current:** Only wordpress-wp-login, apache-high-volume, and User-Agent keyword jails.  
 **Improvement:** Add jails for:
-- **xmlrpc** – 10+ xmlrpc.php requests (similar to find_suspicious_ips)
-- **exploit-probe** – Common exploit paths (_ignition, path traversal, etc.)
+- **xmlrpc** – Block IPs with 10+ xmlrpc.php requests in findtime (common WordPress abuse)
+- **exploit-probe** – Block common exploit paths (e.g. `_ignition`, path traversal, `.env`, `config.php`)
 
-### 4.2 Per-domain or per-jail enable/disable
-**Current:** Jails are global.  
-**Improvement:** Allow enabling/disabling jails per domain or per user (via config or UI). Higher complexity; may need filter changes.
+### 1.2 Per-domain or per-jail enable/disable
+**Current:** Jails are global; all domains are protected.  
+**Improvement:** Allow enabling/disabling jails per domain or per cPanel user via config or UI. Higher complexity; may need filter changes.
 
-### 4.3 Whitelist "never ban" for specific IPs even from whitelisted countries
+### 1.3 Always-ban list (override country whitelist)
 **Current:** Country whitelist applies to all IPs from that country.  
-**Improvement:** Support an "always ban" list (e.g. known bad IPs) that overrides country whitelist.
+**Improvement:** Support an "always ban" list (e.g. known bad IPs or CIDRs) that overrides country whitelist. Blocklist-organizations covers orgs; this would cover specific IPs.
 
-### 4.4 Import/export banned IPs
+### 1.4 Import/export banned IPs
 **Current:** No bulk export/import.  
-**Improvement:** Export banned IPs to CSV and import from a list (e.g. for migration or bulk ban).
+**Improvement:** Export banned IPs to CSV and import from a list (e.g. for migration, backup, or bulk ban from shared blocklists).
+
+### 1.5 Edit User-Agent jail params in WHM UI
+**Current:** User-Agent keyword jails (apache-ua-*) are configured via `useragent-keywords.conf` textarea; per-jail maxretry/findtime/bantime not editable in the jail settings UI (those jails are excluded from the Settings tab).  
+**Improvement:** Either include apache-ua-* jails in the per-jail settings UI, or add inline edit controls in the User-Agent keyword section.
 
 ---
 
-## 5. Security & Performance
+## 2. Security & Performance
 
-### 5.1 Rate limit WHM plugin actions
-**Current:** No explicit rate limiting on deploy/unban.  
-**Improvement:** Add simple rate limiting or confirmation dialogs for destructive actions (e.g. "Deploy config & restart", "Unban all whitelisted").
+### 2.1 Rate limiting and confirmation for destructive actions
+**Current:** No explicit rate limiting on deploy/unban; no confirmation dialogs.  
+**Improvement:** Add confirmation dialogs for destructive actions (e.g. "Deploy config & restart", "Unban all whitelisted", "Clean expired from database"). Optional: simple rate limiting for API-style actions.
 
-### 5.2 Harden csf-ban.sh
-**Current:** Script uses external calls (mmdblookup, curl).  
-**Improvement:** Validate and sanitize IP input more strictly; add a timeout for country lookup to avoid hanging.
+### 2.2 Harden csf-ban.sh
+**Current:** Script uses external calls (mmdblookup, whois, curl).  
+**Improvement:** Validate and sanitize IP input more strictly; add timeouts for country/org lookup to avoid hanging; ensure all external calls have reasonable timeouts.
 
-### 5.3 Optional database for ban history
+### 2.3 Optional database for ban history
 **Current:** Ban history comes from fail2ban SQLite and log parsing.  
-**Improvement:** Optionally store ban events in a dedicated table for reporting and analytics.
+**Improvement:** Optionally store ban events in a dedicated table for reporting and analytics (e.g. ban trends, repeat offenders).
 
 ---
 
-## 6. Documentation & Ops
+## 3. Documentation & Ops
 
-### 6.1 Changelog
+### 3.1 Changelog
 **Current:** No CHANGELOG.  
-**Improvement:** Maintain `CHANGELOG.md` with version, date, and notable changes.
+**Improvement:** Maintain `CHANGELOG.md` with version, date, and notable changes for each release.
 
-### 6.2 Health check script
-**Current:** `status.sh` shows status.  
-**Improvement:** Add `healthcheck.sh` that verifies: fail2ban running, jails enabled, log path exists, GeoIP present, and returns exit code for monitoring.
+### 3.2 Health check script
+**Current:** `status.sh` shows status but is not suitable for monitoring (no structured exit codes).  
+**Improvement:** Add `healthcheck.sh` that verifies: fail2ban running, jails enabled, log path exists, GeoIP present (if configured), and returns appropriate exit codes (0=ok, 1=fail) for monitoring systems (Nagios, Uptime Kuma, etc.).
 
-### 6.3 Upgrade path
-**Current:** Updates are done by re-running setup or reinstalling.  
-**Improvement:** Document upgrade steps (e.g. backup → pull/copy new files → setup.sh) and any config migrations.
+### 3.3 Upgrade path documentation
+**Current:** Updates are done by re-running setup or reinstalling; no formal upgrade doc.  
+**Improvement:** Document upgrade steps (e.g. backup → pull/copy new files → setup.sh) and any config migrations in README or UPGRADE.md.
 
-### 6.4 Integration with find_suspicious_ips.sh
-**Current:** find_suspicious_ips is separate.  
+### 3.4 Expand status.sh to include dynamic jails
+**Current:** `status.sh` only lists `wordpress-wp-login` and `apache-high-volume`.  
+**Improvement:** Include `apache-ua-*` and any other jails (e.g. from `fail2ban-client status` or a configurable list).
+
+### 3.5 Integration with find_suspicious_ips
+**Current:** find_suspicious_ips (if present) is separate.  
 **Improvement:** Document how it relates to fail2ban, or add a "Suggested blocks" section in the WHM plugin that runs a similar scan and suggests IPs to ban.
 
 ---
 
-## 7. Low-Effort Wins
+## 4. Backup & Deploy
 
-| Improvement | Effort | Impact |
-|-------------|--------|--------|
-| Add findtime/bantime presets (5m, 1h, 24h) in UI | Low | Medium |
-| Show "Affected domains" in banned IPs table | Medium | High |
-| Backup before setup.sh deploy | Low | High |
-| Add CHANGELOG.md | Low | Medium |
-| Health check script | Low | Medium |
-| Log level toggle in WHM UI | Low | Low |
+### 4.1 Expand setup.sh backup scope
+**Current:** Backup includes only core filters, jails, and scripts (wordpress-wp-login, apache-high-volume, csf-ban, ignore-countries, blocklist-organizations, ip2location scripts).  
+**Improvement:** Include in backup:
+- `apache-ua-*` filter/jail configs (generated by update-useragent-jails.sh)
+- `useragent-keywords.conf`
+- `email-alerts.conf`
+- Any other runtime-generated or user-edited configs
+
+---
+
+## 5. WHM Plugin UX
+
+### 5.1 Log details fallback when bips.data is empty
+**Current:** Click-to-view log details for banned IPs uses `bips.data` from fail2ban SQLite; often empty if fail2ban does not populate it.  
+**Improvement:** Fallback to grepping domlogs for the IP when bips.data is empty (with reasonable limits).
+
+### 5.2 Reduce fail2ban log noise
+**Current:** "Ignoring entries older than Xs" and "timing issue" warnings appear after restart or with log latency.  
+**Improvement:** Document that these are normal; optionally add a "Known messages" help section in the UI or a link to FAQ.
 
 ---
 
 ## Priority Summary
 
-**High priority:** Backup before deploy, validation in UI, clearer GeoIP setup status.  
-**Medium priority:** Time presets, affected domains column, health check, XML-RPC jail.  
-**Lower priority:** Ban history DB, per-domain enable/disable, email alerts.
+| Priority | Items |
+|----------|-------|
+| **High** | XML-RPC jail, healthcheck script, expand backup scope, status.sh include dynamic jails |
+| **Medium** | Changelog, upgrade docs, confirmation dialogs for destructive actions, edit User-Agent jail params in UI |
+| **Low** | Per-domain enable/disable, always-ban list, import/export, ban history DB, find_suspicious_ips integration |
