@@ -822,6 +822,29 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clean_expired_bips') {
     exit;
 }
 
+// AJAX: Jail Summary table only (for refresh-dashboard icon)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'jail_summary') {
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    $jail_data = [];
+    foreach ($jails as $j) {
+        $jail_data[$j] = parse_jail_status($j);
+    }
+    echo '<table class="table table-bordered table-striped table-condensed" style="max-width:500px;">';
+    echo '<thead><tr><th>Jail</th><th>Currently Banned</th><th>Total Banned</th></tr></thead><tbody>';
+    $sum_current = 0;
+    $sum_total = 0;
+    foreach ($jails as $j): $d = $jail_data[$j];
+        $cur = is_numeric($d['currently_banned']) ? (int)$d['currently_banned'] : 0;
+        $tot = is_numeric($d['total_banned']) ? (int)$d['total_banned'] : 0;
+        $sum_current += $cur;
+        $sum_total += $tot;
+        echo '<tr><td>' . htmlspecialchars($j) . '</td><td>' . htmlspecialchars($d['currently_banned']) . '</td><td>' . htmlspecialchars($d['total_banned']) . '</td></tr>';
+    endforeach;
+    echo '</tbody><tfoot><tr style="font-weight:bold;background:var(--base-02,#f5f5f5);"><td>Total</td><td>' . $sum_current . '</td><td>' . $sum_total . '</td></tr></tfoot></table>';
+    exit;
+}
+
 // AJAX handler must run BEFORE WHM::header() so we don't output the full page wrapper
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'banned_ips') {
     $jail_filter = isset($_GET['jail_filter']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['jail_filter']) : '';
@@ -940,9 +963,10 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
 </div>
 <div class="panel panel-default">
   <div class="panel-heading">Jail Summary
-    <button type="button" class="btn btn-link btn-sm refresh-dashboard" title="Refresh" style="margin-left:6px;"><span class="glyphicon glyphicon-refresh"></span></button>
+    <button type="button" class="btn btn-link btn-sm refresh-dashboard" title="Refresh Jail Summary" style="margin-left:6px;"><span class="glyphicon glyphicon-refresh"></span></button>
   </div>
   <div class="panel-body">
+    <div id="jail-summary-table-container">
     <table class="table table-bordered table-striped table-condensed" style="max-width:500px;">
       <thead><tr><th>Jail</th><th>Currently Banned</th><th>Total Banned</th></tr></thead>
       <tbody>
@@ -964,6 +988,7 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
       </tbody>
       <tfoot><tr style="font-weight:bold;background:var(--base-02,#f5f5f5);"><td>Total</td><td><?php echo $sum_current; ?></td><td><?php echo $sum_total; ?></td></tr></tfoot>
     </table>
+    </div>
     <p style="margin-top:12px;"><a href="?tab=banned" class="btn btn-primary btn-sm">Manage Banned IPs</a></p>
   </div>
 </div>
@@ -1557,9 +1582,17 @@ document.addEventListener('DOMContentLoaded', function() {
     var refreshDashboard = e.target.closest('.refresh-dashboard');
     if (refreshDashboard) {
       e.preventDefault();
+      var container = document.getElementById('jail-summary-table-container');
       var icon = refreshDashboard.querySelector('.glyphicon-refresh');
+      if (!container) return;
       if (icon) icon.classList.add('glyphicon-refresh-animate');
-      window.location.reload();
+      fetch(base + '?ajax=jail_summary', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          if (html && html.indexOf('</table>') !== -1) container.innerHTML = html;
+        })
+        .catch(function() {})
+        .finally(function() { if (icon) icon.classList.remove('glyphicon-refresh-animate'); });
       return;
     }
     var cleanBtn = e.target.closest('.clean-expired-bips');
