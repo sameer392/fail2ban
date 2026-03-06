@@ -225,7 +225,7 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 $current_tab = $_GET['tab'] ?? $_POST['tab'] ?? 'dashboard';
 $valid_tabs = ['dashboard' => 'Dashboard', 'banned' => 'Banned IPs', 'whitelists' => 'Whitelists', 'notifications' => 'Notifications', 'settings' => 'Settings'];
 if (!isset($valid_tabs[$current_tab])) $current_tab = 'dashboard';
-$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'update_ip2location' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'dashboard'];
+$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'update_ip2location' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'settings'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     if ($action === 'save_ignore_countries') {
@@ -405,8 +405,8 @@ if (file_exists($email_conf) && is_readable($email_conf)) {
 }
 $jails = ['wordpress-wp-login', 'apache-high-volume'];
 $jail_labels = [
-    'wordpress-wp-login' => ['failed' => 'Failed logins', 'failed_total' => 'Total failed logins'],
-    'apache-high-volume' => ['failed' => 'Requests in window', 'failed_total' => 'Total requests']
+    'wordpress-wp-login' => ['failed' => 'Failed logins', 'failed_total' => 'Total failed logins', 'maxretry' => 'Max failed attempts'],
+    'apache-high-volume' => ['failed' => 'Requests in window', 'failed_total' => 'Total requests', 'maxretry' => 'Max requests per IP']
 ];
 $jail_data = [];
 $jail_settings = [];
@@ -490,140 +490,34 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
 </ul>
 
 <div class="tab-content">
-<!-- Tab: Dashboard -->
+<!-- Tab: Dashboard (overview only - no duplication) -->
 <div role="tabpanel" class="tab-pane <?php echo $current_tab === 'dashboard' ? 'active' : ''; ?>" id="tab-dashboard">
-<div class="row">
-<div class="col-md-8">
-
-<h3>Status</h3>
-<?php
-$total_24h = array_sum($bans_24h);
-if ($total_24h > 0): $parts = [];
-foreach ($jails as $j) { $c = $bans_24h[$j] ?? 0; if ($c > 0) $parts[] = htmlspecialchars($j) . ': ' . $c; }
-?>
-<p class="text-muted"><strong>Last 24h bans:</strong> <?php echo implode(', ', $parts); ?> — total <?php echo $total_24h; ?></p>
-<?php endif; ?>
-<pre style="background:#f5f5f5;padding:10px;font-size:12px;"><?php echo htmlspecialchars($general_status); ?></pre>
-
-<h3>Jails</h3>
-<?php foreach ($jails as $j):
-$d = $jail_data[$j];
-$js = $jail_settings[$j] ?? ['maxretry' => 5, 'findtime' => 300, 'bantime' => 3600];
-?>
 <div class="panel panel-default">
-  <div class="panel-heading"><?php echo htmlspecialchars($j); ?></div>
+  <div class="panel-heading">Status</div>
   <div class="panel-body">
-    <table class="table table-bordered table-striped table-condensed">
-      <thead>
-        <tr><th>Metric</th><th>Value</th></tr>
-      </thead>
+    <?php $total_24h = array_sum($bans_24h); if ($total_24h > 0): $parts = []; foreach ($jails as $j) { $c = $bans_24h[$j] ?? 0; if ($c > 0) $parts[] = htmlspecialchars($j) . ': ' . $c; } ?>
+    <p class="text-muted"><strong>Last 24h bans:</strong> <?php echo implode(', ', $parts); ?> — total <?php echo $total_24h; ?></p>
+    <?php endif; ?>
+    <pre style="background:var(--base-02,#f5f5f5);padding:10px;font-size:12px;margin:0;"><?php echo htmlspecialchars($general_status); ?></pre>
+  </div>
+</div>
+<div class="panel panel-default">
+  <div class="panel-heading">Jail Summary</div>
+  <div class="panel-body">
+    <table class="table table-bordered table-striped table-condensed" style="max-width:500px;">
+      <thead><tr><th>Jail</th><th>Currently Banned</th><th>Total Banned</th></tr></thead>
       <tbody>
-        <?php $lbl = $jail_labels[$j] ?? ['failed' => 'Currently failed', 'failed_total' => 'Total failed']; ?>
-        <tr><td><?php echo htmlspecialchars($lbl['failed']); ?></td><td><?php echo htmlspecialchars($d['currently_failed']); ?></td></tr>
-        <tr><td><?php echo htmlspecialchars($lbl['failed_total']); ?></td><td><?php echo htmlspecialchars($d['total_failed']); ?></td></tr>
-        <tr><td>Currently banned</td><td><?php echo htmlspecialchars($d['currently_banned']); ?></td></tr>
-        <tr><td>Total banned</td><td><?php echo htmlspecialchars($d['total_banned']); ?></td></tr>
-      </tbody>
-    </table>
-    <form method="post" class="form-inline jail-settings-form" style="margin-bottom:12px;padding:8px;background:var(--base-01,#f9f9f9);border-radius:4px;" data-maxretry-min="1" data-maxretry-max="10000" data-findtime-min="60" data-findtime-max="2592000" data-bantime-min="60" data-bantime-max="31536000">
-      <input type="hidden" name="action" value="save_jail_settings">
-      <input type="hidden" name="tab" value="dashboard">
-      <input type="hidden" name="jail" value="<?php echo htmlspecialchars($j); ?>">
-      <label>maxretry</label>
-      <input type="number" name="maxretry" value="<?php echo (int)$js['maxretry']; ?>" min="1" max="10000" class="form-control input-sm" style="width:70px;margin:0 8px 0 4px;" title="Max attempts before ban (1-10000)" required>
-      <label style="margin-left:8px;">findtime</label>
-      <input type="number" name="findtime" value="<?php echo (int)$js['findtime']; ?>" min="60" max="2592000" class="form-control input-sm" style="width:80px;margin:0 4px 0 4px;" title="Window in seconds, 60-2592000 (30 days)" data-preset-field="findtime" required>
-      <span class="text-muted" style="font-size:11px;">sec</span>
-      <select class="form-control input-sm findtime-preset" style="width:auto;margin-left:4px;display:inline-block;" title="Quick presets: 300=5min, 600=10min">
-        <option value="">preset</option>
-        <option value="60">1 min</option>
-        <option value="300">5 min</option>
-        <option value="600">10 min</option>
-        <option value="3600">1 hr</option>
-      </select>
-      <label style="margin-left:8px;">bantime</label>
-      <input type="number" name="bantime" value="<?php echo (int)$js['bantime']; ?>" min="60" max="31536000" class="form-control input-sm" style="width:80px;margin:0 4px 0 4px;" title="Ban duration in seconds, 60-31536000 (1 year)" data-preset-field="bantime" required>
-      <span class="text-muted" style="font-size:11px;">sec</span>
-      <select class="form-control input-sm bantime-preset" style="width:auto;margin-left:4px;display:inline-block;" title="Quick presets: 3600=1hr, 86400=24hr">
-        <option value="">preset</option>
-        <option value="300">5 min</option>
-        <option value="3600">1 hr</option>
-        <option value="86400">24 hr</option>
-        <option value="604800">1 week</option>
-      </select>
-      <button type="submit" class="btn btn-primary btn-sm" style="margin-left:8px;">Save &amp; Deploy</button>
-      <span class="jail-settings-err text-danger" style="margin-left:8px;display:none;"></span>
-    </form>
-    <p><strong>Banned IPs:</strong>
-      <button type="button" class="btn btn-link reload-banned-ips" data-jail="<?php echo htmlspecialchars($j); ?>" title="Refresh table" style="margin-left:6px;padding:0 4px;vertical-align:middle;"><span class="glyphicon glyphicon-refresh"></span></button>
-    </p>
-    <div id="banned-ips-<?php echo htmlspecialchars($j); ?>" class="banned-ips-container">
-    <?php if (!empty($d['banned_ips'])): $ban_times = get_ban_times($j); $domain_cache = []; ?>
-    <table class="table table-bordered table-striped table-condensed banned-ips-table">
-      <thead><tr><th><input type="checkbox" class="select-all-banned" data-jail="<?php echo htmlspecialchars($j); ?>" data-container="banned-ips-<?php echo htmlspecialchars($j); ?>" title="Select all"></th><th>#</th><th>IP Address</th><th>Country</th><th>Affected Domains</th><th>Banned At</th><th>Action</th></tr></thead>
-      <tbody>
-      <?php $country_cache = []; foreach (array_values($d['banned_ips']) as $i => $ip): $country = get_ip_country($ip, $country_cache); $affected = get_affected_domains($ip, $j, $domain_cache); $banned_at = $ban_times[$ip] ?? '-'; $is_whitelisted = in_array($country, $whitelist_countries_arr); ?>
-        <tr<?php echo $is_whitelisted ? ' class="warning" style="background:var(--accent-01,#fff3cd)"' : ''; ?>>
-          <td><input type="checkbox" class="banned-ip-cb" name="unban_ips[]" value="<?php echo htmlspecialchars($ip); ?>" form="bulk-unban-<?php echo htmlspecialchars($j); ?>"></td>
-          <td><?php echo $i + 1; ?></td>
-          <td><code><?php echo htmlspecialchars($ip); ?></code></td>
-          <td><?php echo htmlspecialchars($country); ?><?php if ($is_whitelisted): ?> <span class="label label-warning">whitelisted</span><?php endif; ?></td>
-          <td style="max-width:200px;font-size:11px;" title="<?php echo htmlspecialchars($affected); ?>"><?php echo htmlspecialchars($affected); ?></td>
-          <td><?php echo htmlspecialchars($banned_at); ?></td>
-          <td>
-            <form method="post" style="display:inline;margin:0;">
-              <input type="hidden" name="action" value="unban">
-              <input type="hidden" name="tab" value="dashboard">
-              <input type="hidden" name="jail" value="<?php echo htmlspecialchars($j); ?>">
-              <input type="hidden" name="ip" value="<?php echo htmlspecialchars($ip); ?>">
-              <button type="submit" class="btn btn-default btn-xs">Unban</button>
-            </form>
-          </td>
+      <?php foreach ($jails as $j): $d = $jail_data[$j]; ?>
+        <tr>
+          <td><?php echo htmlspecialchars($j); ?></td>
+          <td><?php echo htmlspecialchars($d['currently_banned']); ?></td>
+          <td><?php echo htmlspecialchars($d['total_banned']); ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
     </table>
-    <form id="bulk-unban-<?php echo htmlspecialchars($j); ?>" method="post" style="margin-top:6px;">
-      <input type="hidden" name="action" value="unban_bulk">
-      <input type="hidden" name="tab" value="dashboard">
-      <input type="hidden" name="jail" value="<?php echo htmlspecialchars($j); ?>">
-      <button type="submit" class="btn btn-warning btn-sm bulk-unban-btn" disabled>Unban selected</button>
-    </form>
-    <?php else: ?>
-    <p class="text-muted">No banned IPs.</p>
-    <?php endif; ?>
-    </div>
-    <form method="post" class="form-inline" style="margin-top:8px;">
-      <input type="hidden" name="action" value="unban">
-      <input type="hidden" name="tab" value="dashboard">
-      <input type="hidden" name="jail" value="<?php echo htmlspecialchars($j); ?>">
-      <input type="text" name="ip" placeholder="IP to unban" class="form-control input-sm" style="width:150px;">
-      <button type="submit" class="btn btn-default btn-sm">Unban</button>
-    </form>
+    <p style="margin-top:12px;"><a href="?tab=banned" class="btn btn-primary btn-sm">Manage Banned IPs</a></p>
   </div>
-</div>
-<?php endforeach; ?>
-
-</div>
-<p style="margin-top:12px;"><a href="?tab=banned" class="btn btn-link btn-sm">View all banned IPs &rarr;</a></p>
-</div>
-<div class="col-md-4">
-  <div class="panel panel-default">
-    <div class="panel-heading">Quick Actions</div>
-    <div class="panel-body">
-      <form method="post" style="margin-bottom:8px;">
-        <input type="hidden" name="action" value="deploy">
-        <input type="hidden" name="tab" value="dashboard">
-        <button type="submit" class="btn btn-primary btn-sm btn-block">Deploy config &amp; restart</button>
-      </form>
-      <form method="post">
-        <input type="hidden" name="action" value="update_ip2location">
-        <input type="hidden" name="tab" value="dashboard">
-        <button type="submit" class="btn btn-default btn-sm btn-block">Update IP2Location DB</button>
-      </form>
-    </div>
-  </div>
-</div>
 </div>
 </div>
 
@@ -781,14 +675,37 @@ $d = $jail_data[$j];
 </div>
 </div>
 
-<!-- Tab: Settings -->
+<!-- Tab: Settings (all configuration - single place) -->
 <div role="tabpanel" class="tab-pane <?php echo $current_tab === 'settings' ? 'active' : ''; ?>" id="tab-settings">
+<?php foreach ($jails as $j):
+$js = $jail_settings[$j] ?? ['maxretry' => 5, 'findtime' => 300, 'bantime' => 3600];
+?>
+<div class="panel panel-default">
+  <div class="panel-heading">Jail: <?php echo htmlspecialchars($j); ?></div>
+  <div class="panel-body">
+    <form method="post" class="form-inline jail-settings-form" data-maxretry-min="1" data-maxretry-max="10000" data-findtime-min="60" data-findtime-max="2592000" data-bantime-min="60" data-bantime-max="31536000">
+      <input type="hidden" name="action" value="save_jail_settings">
+      <input type="hidden" name="tab" value="settings">
+      <input type="hidden" name="jail" value="<?php echo htmlspecialchars($j); ?>">
+      <label><?php echo htmlspecialchars(($jail_labels[$j]['maxretry'] ?? 'maxretry')); ?></label>
+      <input type="number" name="maxretry" value="<?php echo (int)$js['maxretry']; ?>" min="1" max="10000" class="form-control input-sm" style="width:70px;margin:0 8px 0 4px;" title="Internal: maxretry" required>
+      <label style="margin-left:8px;">findtime</label>
+      <input type="number" name="findtime" value="<?php echo (int)$js['findtime']; ?>" min="60" max="2592000" class="form-control input-sm" style="width:80px;" required>
+      <select class="form-control input-sm findtime-preset" style="width:auto;margin-left:4px;"><option value="">preset</option><option value="60">1m</option><option value="300">5m</option><option value="600">10m</option><option value="3600">1h</option></select>
+      <label style="margin-left:8px;">bantime</label>
+      <input type="number" name="bantime" value="<?php echo (int)$js['bantime']; ?>" min="60" max="31536000" class="form-control input-sm" style="width:80px;" required>
+      <select class="form-control input-sm bantime-preset" style="width:auto;margin-left:4px;"><option value="">preset</option><option value="300">5m</option><option value="3600">1h</option><option value="86400">24h</option><option value="604800">1w</option></select>
+      <button type="submit" class="btn btn-primary btn-sm" style="margin-left:8px;">Save &amp; Deploy</button>
+      <span class="jail-settings-err text-danger" style="margin-left:8px;display:none;"></span>
+    </form>
+  </div>
+</div>
+<?php endforeach; ?>
 <div class="row">
   <div class="col-md-6">
     <div class="panel panel-default">
       <div class="panel-heading">Log Level</div>
       <div class="panel-body">
-        <p class="text-muted">Verbosity of /var/log/fail2ban.log</p>
         <form method="post" class="form-inline">
           <input type="hidden" name="action" value="save_loglevel">
           <input type="hidden" name="tab" value="settings">
@@ -906,13 +823,12 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault();
       e.stopPropagation();
       var jail = this.getAttribute('data-jail');
-      var container = document.getElementById('banned-ips-' + jail + '-tab') || document.getElementById('banned-ips-' + jail);
+      var container = document.getElementById('banned-ips-' + jail + '-tab');
       if (!container) return false;
       var icon = this.querySelector('.glyphicon-refresh');
       if (icon) icon.classList.add('glyphicon-refresh-animate');
       var base = (window.location.href || '').split('?')[0];
-      var fs = (container.id && container.id.indexOf('-tab') > 0) ? '&fs=tab' : '';
-      var url = base + '?ajax=banned_ips&jail=' + encodeURIComponent(jail) + fs;
+      var url = base + '?ajax=banned_ips&jail=' + encodeURIComponent(jail) + '&fs=tab';
       fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function(r) { return r.text(); })
         .then(function(html) {
