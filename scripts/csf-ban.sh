@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fail2Ban CSF ban helper - adds IP to csf.deny with jail name and affected domain(s)
 # Skips banning IPs from whitelisted countries (see ignore-countries.conf)
-# Exceptions: blocked orgs (blocklist-organizations.conf) and multi-domain abuse
+# Exceptions: blocked orgs (blocklist-organizations.conf), multi-domain abuse, and User-Agent keyword jails (apache-ua-*)
 # Usage: csf-ban.sh <ip> <jail_name>
 # Comment format: Fail2Ban <jail> - <domain1, domain2, ...>
 
@@ -17,6 +17,9 @@ DOMLOGS="${DOMLOGS:-/usr/local/apache/domlogs}"
 # Skip private/local IPs
 [[ "$IP" =~ ^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.) ]] && exit 0
 [[ "$IP" =~ ^(::1|fc00:|fe80:) ]] && exit 0
+
+# User-Agent keyword jails (apache-ua-*) always ban - ignore country whitelist
+[[ "$JAIL" == apache-ua-* ]] && SKIP_WHITELIST=1 || SKIP_WHITELIST=0
 
 # Find domains that had traffic from this IP (needed for comment and multi-domain check)
 DOMAINS=""
@@ -37,9 +40,9 @@ BLOCKED_ORGANIZATIONS=""
 MULTI_DOMAIN_ABUSE_THRESHOLD=0
 [ -f "$BLOCKLIST_CONFIG" ] && . "$BLOCKLIST_CONFIG"
 
-# Check country and skip if whitelisted (with exceptions)
+# Check country and skip if whitelisted (with exceptions) - skip for apache-ua-* jails
 SKIP_BAN=0
-if [ -n "$WHITELIST_COUNTRIES" ]; then
+if [ "$SKIP_WHITELIST" != "1" ] && [ -n "$WHITELIST_COUNTRIES" ]; then
     COUNTRY=""
     # IP2Location LITE DB1 (country lookup via mmdblookup)
     for db in /etc/fail2ban/GeoIP/IP2LOCATION-LITE-DB1.mmdb; do

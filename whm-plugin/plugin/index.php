@@ -333,6 +333,25 @@ function save_jail_settings($jail, $maxretry, $findtime, $bantime) {
     return file_put_contents($path, $content) !== false;
 }
 
+function get_useragent_keywords() {
+    $conf = '/etc/fail2ban/scripts/useragent-keywords.conf';
+    $rows = [];
+    if (!file_exists($conf) || !is_readable($conf)) return $rows;
+    foreach (file($conf, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') continue;
+        $parts = array_map('trim', explode('|', $line, 4));
+        if (empty($parts[0])) continue;
+        $rows[] = [
+            'keyword' => $parts[0],
+            'maxretry' => max(1, (int)($parts[1] ?? 1)),
+            'findtime' => max(60, (int)($parts[2] ?? 60)),
+            'bantime' => max(60, (int)($parts[3] ?? 3600))
+        ];
+    }
+    return $rows;
+}
+
 function parse_jail_status($jail) {
     $data = ['active' => false, 'currently_failed' => '-', 'total_failed' => '-', 'currently_banned' => '-', 'total_banned' => '-', 'banned_ips' => []];
     exec("fail2ban-client status " . escapeshellarg($jail) . " 2>/dev/null", $out, $ret);
@@ -416,6 +435,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
         } else {
             $msg = 'Could not write to /etc/fail2ban/scripts/';
         }
+    } elseif ($action === 'save_useragent_keywords') {
+        $conf = '/etc/fail2ban/scripts/useragent-keywords.conf';
+        $dir = dirname($conf);
+        $lines = [];
+        $raw = $_POST['useragent_keywords'] ?? '';
+        foreach (array_filter(preg_split('/\r?\n/', $raw)) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') continue;
+            $parts = array_map('trim', explode('|', $line, 4));
+            if (empty($parts[0])) continue;
+            $kw = preg_replace('/[^a-zA-Z0-9\s\-_]/', '', $parts[0]);
+            if ($kw === '') continue;
+            $maxretry = max(1, min(100, (int)($parts[1] ?? 1)));
+            $findtime = max(60, min(86400 * 7, (int)($parts[2] ?? 60)));
+            $bantime = max(60, min(86400 * 365, (int)($parts[3] ?? 3600)));
+            $lines[] = $kw . '|' . $maxretry . '|' . $findtime . '|' . $bantime;
+        }
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $content = "# User-Agent keyword blocking (keyword|maxretry|findtime|bantime)\n# Examples: python|1|60|3600  headless|2|300|86400\n" . implode("\n", $lines) . "\n";
+        if (file_put_contents($conf, $content) !== false) {
+            exec('/etc/fail2ban/scripts/update-useragent-jails.sh 2>&1', $out, $ret);
+            $msg = $ret === 0 ? 'User-Agent keywords saved and fail2ban reloaded.' : 'Saved but reload failed: ' . implode(' ', $out);
+        } else {
+            $msg = 'Could not write useragent-keywords.conf';
+        }
     } elseif ($action === 'deploy') {
         exec('/usr/share/fail2ban/setup.sh 2>&1', $out, $ret);
         $msg = $ret === 0 ? 'Config deployed and fail2ban restarted.' : 'Deploy failed: ' . implode("\n", $out);
@@ -430,7 +474,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
         $jail = preg_replace('/[^a-zA-Z0-9_-]/', '', $_POST['jail'] ?? '');
         $ips = is_array($_POST['unban_ips'] ?? null) ? $_POST['unban_ips'] : [];
         $unbanned = 0;
-        if ($jail && in_array($jail, ['wordpress-wp-login', 'apache-high-volume']) && !empty($ips)) {
+        if ($jail && in_array($jail, $jails) && !empty($ips)) {
             foreach ($ips as $ip) {
                 $ip = preg_replace('/[^0-9a-fA-F.:]/', '', $ip);
                 if ($ip) {
@@ -622,6 +666,12 @@ $jail_labels = [
     'wordpress-wp-login' => ['failed' => 'Failed logins', 'failed_total' => 'Total failed logins', 'maxretry' => 'Max failed attempts'],
     'apache-high-volume' => ['failed' => 'Requests in window', 'failed_total' => 'Total requests', 'maxretry' => 'Max requests per IP']
 ];
+foreach (get_useragent_keywords() as $ua) {
+    $jid = 'apache-ua-' . trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($ua['keyword'])), '-');
+    $jid = $jid !== 'apache-ua-' ? $jid : 'apache-ua-kw';
+    $jails[] = $jid;
+    $jail_labels[$jid] = ['failed' => 'UA matches', 'failed_total' => 'UA matches', 'maxretry' => 'Max (keyword: ' . $ua['keyword'] . ')'];
+}
 $jail_data = [];
 $jail_settings = [];
 foreach ($jails as $j) {
@@ -636,7 +686,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ip_log_details' && isset($_GET['i
     $ajail = preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['jail']);
     $matches = [];
     $failures = 0;
-    if ($ip && $ajail && in_array($ajail, ['wordpress-wp-login', 'apache-high-volume'])) {
+    if ($ip && $ajail && in_array($ajail, $jails)) {
         $db = '/var/lib/fail2ban/fail2ban.sqlite3';
         if (file_exists($db) && is_readable($db)) {
             $out = [];
@@ -942,8 +992,28 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
 
 <!-- Tab: Settings (all configuration - single place) -->
 <div role="tabpanel" class="tab-pane <?php echo $current_tab === 'settings' ? 'active' : ''; ?>" id="tab-settings">
+<div class="panel panel-default">
+  <div class="panel-heading">User-Agent Keyword Blocking</div>
+  <div class="panel-body">
+    <p class="text-muted">Block IPs when their User-Agent contains these keywords (e.g. python, headless, curl). Each keyword has its own max requests, time window, and ban duration. Format: <code>keyword|maxretry|findtime|bantime</code> (one per line).</p>
+    <form method="post">
+      <input type="hidden" name="action" value="save_useragent_keywords">
+      <input type="hidden" name="tab" value="settings">
+      <textarea name="useragent_keywords" class="form-control" rows="8" style="font-family:monospace;font-size:12px;" placeholder="python|1|60|3600"><?php
+$ua_lines = [];
+foreach (get_useragent_keywords() as $u) {
+    $ua_lines[] = $u['keyword'] . '|' . $u['maxretry'] . '|' . $u['findtime'] . '|' . $u['bantime'];
+}
+echo htmlspecialchars(implode("\n", $ua_lines));
+      ?></textarea>
+      <p class="text-muted" style="margin-top:6px;font-size:12px;">Example: <code>python|1|60|3600</code> = ban after 1 match in 60 sec, for 1 hour. <code>headless|2|300|86400</code> = 2 matches in 5 min, ban 24h.</p>
+      <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px;">Save &amp; Apply</button>
+    </form>
+  </div>
+</div>
 <?php foreach ($jails as $j):
 $js = $jail_settings[$j] ?? ['maxretry' => 5, 'findtime' => 300, 'bantime' => 3600];
+if (strpos($j, 'apache-ua-') === 0) continue;
 ?>
 <div class="panel panel-default">
   <div class="panel-heading">Jail: <?php echo htmlspecialchars($j); ?></div>
@@ -1046,7 +1116,7 @@ $js = $jail_settings[$j] ?? ['maxretry' => 5, 'findtime' => 300, 'bantime' => 36
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   var base = (window.location.href || '').split('?')[0];
-  var jails = ['wordpress-wp-login', 'apache-high-volume'];
+  var jails = <?php echo json_encode($jails); ?>;
 
   (function() {
     var modal = document.getElementById('ip-log-modal');
