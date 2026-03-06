@@ -474,6 +474,7 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
 </ol>
 
 <div id="fail2ban-msg" class="alert alert-info" style="display:<?php echo $msg ? 'block' : 'none'; ?>;"><?php echo $msg ? htmlspecialchars($msg) : ''; ?></div>
+<div id="fail2ban-loading" class="fail2ban-loading-overlay" style="display:none;"><span class="fail2ban-spinner"></span><span>Processing...</span></div>
 <?php if (!$geoip_ready): ?>
 <p class="alert alert-warning">
   <strong>GeoIP not configured.</strong> Country lookup uses ip-api.com (rate-limited). For better reliability, run <code>/etc/fail2ban/scripts/setup-ip2location.sh</code> as root. Use "Update IP2Location DB" in the Settings tab to refresh after setup.
@@ -811,26 +812,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // AJAX form submission
-  document.querySelectorAll('.fail2ban-manager form').forEach(function(form) {
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
-      var btn = form.querySelector('button[type="submit"]');
-      if (btn) btn.disabled = true;
-      var fd = new FormData(form);
-      fetch(form.action || window.location.href, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(function(r) { return r.json().catch(function() { return { ok: false, msg: 'Invalid response' }; }); })
-        .then(function(data) {
-          showMsg(data.msg || 'Done.', !data.ok);
-          if (data.refresh_banned) refreshBannedIps();
-        })
-        .catch(function() {
-          showMsg('Request failed. Please try again.', true);
-        })
-        .finally(function() {
-          if (btn) btn.disabled = false;
-        });
-    });
+  // AJAX form submission (event delegation so dynamically loaded forms work)
+  document.addEventListener('submit', function(e) {
+    var form = e.target;
+    if (form.tagName !== 'FORM' || !form.closest || !form.closest('.fail2ban-manager')) return;
+    e.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    var loadingEl = document.getElementById('fail2ban-loading');
+    if (loadingEl) loadingEl.style.display = 'flex';
+    var fd = new FormData(form);
+    var url = (form.getAttribute && form.getAttribute('action')) || window.location.href;
+    fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r) { return r.json().catch(function() { return { ok: false, msg: 'Invalid response' }; }); })
+      .then(function(data) {
+        showMsg(data.msg || 'Done.', !data.ok);
+        if (data.refresh_banned) refreshBannedIps();
+      })
+      .catch(function() {
+        showMsg('Request failed. Please try again.', true);
+      })
+      .finally(function() {
+        if (btn) btn.disabled = false;
+        var le = document.getElementById('fail2ban-loading');
+        if (le) le.style.display = 'none';
+      });
   });
 
   // Time preset dropdowns
@@ -935,6 +941,8 @@ document.addEventListener('DOMContentLoaded', function() {
 .fail2ban-manager .panel-default > .panel-heading { background: var(--base-02, #f5f5f5); color: inherit; border-color: var(--border-01, #ddd); }
 .glyphicon-refresh-animate { animation: spin 0.8s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.fail2ban-loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.35); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: var(--base-01, #fff); font-size: 14px; }
+.fail2ban-spinner { width: 36px; height: 36px; border: 4px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
 </style>
 
 <?php WHM::footer(); ?>
