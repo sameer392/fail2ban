@@ -67,9 +67,26 @@ if [ -n "$WHITELIST_COUNTRIES" ]; then
                 fi
             fi
             # Exception 2: Blocked organization - ban Microsoft, DigitalOcean, etc.
-            if [ "$SKIP_BAN" = "1" ] && [ -n "$BLOCKED_ORGANIZATIONS" ] && command -v curl &>/dev/null; then
-                ORG_RAW=$(curl -s --connect-timeout 2 --max-time 4 "http://ip-api.com/json/${IP}?fields=org,isp" 2>/dev/null)
-                ORG=$(echo "$ORG_RAW" | grep -oE '"(org|isp)":"[^"]*"' | cut -d'"' -f4 | tr '\n' ' ')
+            if [ "$SKIP_BAN" = "1" ] && [ -n "$BLOCKED_ORGANIZATIONS" ]; then
+                ORG=""
+                # Prefer local mmdb (IP2Location LITE ASN)
+                ASN_MMDB="/etc/fail2ban/GeoIP/IP2LOCATION-LITE-ASN.mmdb"
+                if [ -f "$ASN_MMDB" ] && command -v mmdblookup &>/dev/null; then
+                    for path in "as" "autonomous_system_organization" "organization"; do
+                        ORG=$(mmdblookup -f "$ASN_MMDB" -i "$IP" "$path" 2>/dev/null | grep -m1 'utf8_string' | sed 's/.*"\([^"]*\)".*/\1/')
+                        [ -n "$ORG" ] && [ "$ORG" != "-" ] && break
+                    done
+                fi
+                # Fallback: local whois
+                if [ -z "$ORG" ] && command -v whois &>/dev/null; then
+                    ORG_RAW=$(whois "$IP" 2>/dev/null)
+                    ORG=$(echo "$ORG_RAW" | grep -m1 -E '^OrgName:|^Organization:' | sed 's/^[^:]*:[ \t]*//' | sed 's/ ([A-Z0-9]*)$//' | tr -d '\n')
+                fi
+                # Fallback: ip-api.com
+                if [ -z "$ORG" ] && command -v curl &>/dev/null; then
+                    ORG_RAW=$(curl -s --connect-timeout 2 --max-time 4 "http://ip-api.com/json/${IP}?fields=org,isp" 2>/dev/null)
+                    ORG=$(echo "$ORG_RAW" | grep -oE '"(org|isp)":"[^"]*"' | cut -d'"' -f4 | tr '\n' ' ')
+                fi
                 for bl in $(echo "$BLOCKED_ORGANIZATIONS" | tr ',' ' '); do
                     bl=$(echo "$bl" | tr -d ' ')
                     [ -z "$bl" ] && continue

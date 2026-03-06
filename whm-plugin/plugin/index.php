@@ -46,6 +46,7 @@ function get_ip_org($ip, &$cache = []) {
     }
     $org = '';
     $pdo = get_ip_country_cache_db();
+    // 1. Check SQLite cache first (local, instant)
     if ($pdo) {
         $stmt = $pdo->prepare("SELECT org FROM ip_org WHERE ip = ?");
         if ($stmt && $stmt->execute([$ip])) {
@@ -53,23 +54,49 @@ function get_ip_org($ip, &$cache = []) {
             if ($row) return $cache[$ip] = $row['org'];
         }
     }
-    if (function_exists('file_get_contents') && ini_get('allow_url_fopen')) {
-        $json = @file_get_contents("http://ip-api.com/json/" . urlencode($ip) . "?fields=org,isp", false, stream_context_create(['http' => ['timeout' => 2]]));
-        if ($json) {
-            if (preg_match('/"org":"([^"]*)"/', $json, $m) && trim($m[1]) !== '') $org = trim($m[1]);
-            elseif (preg_match('/"isp":"([^"]*)"/', $json, $m) && trim($m[1]) !== '') $org = trim($m[1]);
+    // 2. Try local mmdb (IP2Location LITE ASN - org/AS name)
+    $asn_mmdb = '/etc/fail2ban/GeoIP/IP2LOCATION-LITE-ASN.mmdb';
+    if ($org === '' && file_exists($asn_mmdb) && is_readable($asn_mmdb) && function_exists('exec')) {
+        $out = [];
+        foreach (['as', 'autonomous_system_organization', 'organization'] as $path) {
+            @exec("mmdblookup -f " . escapeshellarg($asn_mmdb) . " -i " . escapeshellarg($ip) . " " . escapeshellarg($path) . " 2>/dev/null", $out, $ret);
+            if ($ret === 0 && !empty($out)) {
+                $text = implode(' ', $out);
+                if (preg_match('/"([^"]+)"/', $text, $m) && trim($m[1]) !== '' && trim($m[1]) !== '-') {
+                    $org = trim($m[1]);
+                    break;
+                }
+            }
+            $out = [];
         }
-    } elseif (function_exists('curl_init')) {
-        $ch = curl_init("http://ip-api.com/json/" . urlencode($ip) . "?fields=org,isp");
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2]);
-        $json = @curl_exec($ch);
-        curl_close($ch);
-        if ($json) {
+    }
+    // 3. Try local whois (system tool, queries RIRs - no third-party API)
+    if (function_exists('exec')) {
+        $out = [];
+        @exec("whois " . escapeshellarg($ip) . " 2>/dev/null", $out, $ret);
+        $text = implode("\n", $out);
+        if (preg_match('/^OrgName:\s*(.+)$/m', $text, $m)) $org = trim($m[1]);
+        elseif (preg_match('/^Organization:\s*([^(]+)/m', $text, $m)) $org = trim($m[1]);
+        elseif (preg_match('/^netname:\s*(.+)$/mi', $text, $m)) $org = trim($m[1]);
+        elseif (preg_match('/^descr:\s*(.+)$/mi', $text, $m)) $org = trim($m[1]);
+    }
+    // 4. Fallback: remote API (ip-api.com) only when whois fails
+    if ($org === '' && (function_exists('file_get_contents') && ini_get('allow_url_fopen') || function_exists('curl_init'))) {
+        if (function_exists('file_get_contents') && ini_get('allow_url_fopen')) {
+            $json = @file_get_contents("http://ip-api.com/json/" . urlencode($ip) . "?fields=org,isp", false, stream_context_create(['http' => ['timeout' => 2]]));
+        } else {
+            $ch = curl_init("http://ip-api.com/json/" . urlencode($ip) . "?fields=org,isp");
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2]);
+            $json = @curl_exec($ch);
+            curl_close($ch);
+        }
+        if (!empty($json)) {
             if (preg_match('/"org":"([^"]*)"/', $json, $m) && trim($m[1]) !== '') $org = trim($m[1]);
             elseif (preg_match('/"isp":"([^"]*)"/', $json, $m) && trim($m[1]) !== '') $org = trim($m[1]);
         }
     }
     $org = $org ?: '-';
+    // 5. Store in SQLite for future lookups (all sources cached)
     if ($pdo) {
         $stmt = $pdo->prepare("INSERT OR REPLACE INTO ip_org (ip, org, updated_at) VALUES (?, ?, ?)");
         if ($stmt) @$stmt->execute([$ip, $org, time()]);

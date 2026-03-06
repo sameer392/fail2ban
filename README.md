@@ -183,6 +183,16 @@ WHITELIST_COUNTRIES=IN,US,GB
 - Country lookup: IP2Location LITE DB1 → ip-api.com fallback
 - Setup: Run `scripts/setup-ip2location.sh` during install or manually
 
+### Organization Lookup (for WHM display and blocked-orgs)
+
+Organization (Microsoft, DigitalOcean, etc.) is shown in the Banned IPs table. Lookup order:
+1. SQLite cache (local)
+2. IP2Location LITE ASN mmdb (local file)
+3. whois (system tool)
+4. ip-api.com (fallback)
+
+For local mmdb, run `scripts/setup-ip2location-asn.sh` (requires IP2LOCATION_TOKEN in `/etc/fail2ban/GeoIP/ip2location.conf`). Without it, whois/ip-api.com are used. All results are cached in SQLite.
+
 ---
 
 ## CSF Integration
