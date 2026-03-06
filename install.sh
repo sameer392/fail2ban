@@ -51,7 +51,7 @@ if [ "$SCRIPT_SRC" != "$INSTALL_DIR" ]; then
          fi
       fi
    done
-   for f in install.sh setup.sh uninstall.sh restore-backup.sh update-whitelist.sh status.sh whitelist-ips.conf fail2ban-logrotate; do
+   for f in install.sh update.sh uninstall.sh restore-backup.sh update-whitelist.sh status.sh whitelist-ips.conf fail2ban-logrotate; do
       [ -f "$SCRIPT_SRC/$f" ] && copy_if_changed "$SCRIPT_SRC/$f" "$INSTALL_DIR/$f" && updated=1
    done
    [ "$updated" -eq 1 ] && echo "      Source installed/updated." || echo "      Source unchanged (already up to date)."
@@ -135,7 +135,7 @@ echo "      fail2ban enabled and restarted."
 
 # 7. Install/update WHM plugin (if cPanel present)
 echo "[7/8] Installing WHM plugin..."
-# Use SCRIPT_SRC so running install.sh from source deploys plugin via install-whm-plugin.sh (same as setup.sh)
+# Use SCRIPT_SRC so running install.sh from source deploys plugin via install-whm-plugin.sh (same as update.sh)
 WHM_PLUGIN_DIR="$SCRIPT_SRC/whm-plugin"
 if [ -x "$WHM_PLUGIN_DIR/install-whm-plugin.sh" ] && [ -f "$WHM_PLUGIN_DIR/plugin/index.php" ]; then
    (cd "$WHM_PLUGIN_DIR" && ./install-whm-plugin.sh) && echo "      WHM plugin installed." || echo "      WHM plugin install failed."

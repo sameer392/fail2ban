@@ -53,7 +53,7 @@ cd /root/fail2ban
 ### Config Deploy Only (fail2ban already installed)
 
 ```bash
-/usr/share/fail2ban/setup.sh
+/usr/share/fail2ban/update.sh
 ```
 
 Copies filters, jails, actions, scripts, and logrotate config from `/usr/share/fail2ban/` to `/etc/fail2ban/` and restarts fail2ban.
@@ -76,7 +76,7 @@ Copies filters, jails, actions, scripts, and logrotate config from `/usr/share/f
 /root/fail2ban/
 ├── install.sh              # Full install (packages, config, WHM plugin)
 ├── uninstall.sh            # Remove config; --purge for full removal
-├── setup.sh                # Deploy config only
+├── update.sh                # Deploy config only
 ├── status.sh               # Show fail2ban and jail status
 ├── update-whitelist.sh     # Regenerate filter ignoreregex from whitelist-ips.conf
 ├── whitelist-ips.conf      # IP/CIDR whitelist (never banned)
@@ -168,7 +168,7 @@ IPs/CIDRs in this file are excluded from bans. Supported: single IP, /24, /28, /
 
 1. Edit `whitelist-ips.conf` (in `/usr/share/fail2ban/` or package root)
 2. Run `update-whitelist.sh` – regenerates filter ignoreregex
-3. Run `setup.sh` – deploy and restart
+3. Run `update.sh` – deploy and restart
 
 ### Country Whitelist (ignore-countries.conf)
 
@@ -228,8 +228,8 @@ systemctl restart cpanel
 | **Banned IPs** | Table with IP, country (GeoIP), banned time, Unban button; reload icon for AJAX refresh |
 | **Unban** | Per-IP or "Unban all from whitelisted countries" |
 | **Ignore Countries** | Edit ISO codes; saves to ignore-countries.conf |
-| **Whitelist IPs** | Edit whitelist-ips.conf; Save & Deploy runs update-whitelist + setup |
-| **Deploy** | Runs setup.sh to deploy config and restart fail2ban |
+| **Whitelist IPs** | Edit whitelist-ips.conf; Save & Deploy runs update-whitelist + update |
+| **Deploy** | Runs update.sh to deploy config and restart fail2ban |
 | **Update IP2Location** | Refreshes GeoIP database |
 
 **Access:** WHM → Plugins → Fail2Ban Manager, or search "Fail2Ban Manager". Requires root or full reseller ACL.
@@ -276,7 +276,7 @@ ls /usr/local/apache/domlogs/*/* | head -5
 
 ### Backup & Restore
 
-`setup.sh` creates a timestamped backup in `/etc/fail2ban/backups/YYYYMMDD-HHMMSS/` before each deploy (keeps last 10). To restore: `restore-backup.sh` (latest) or `restore-backup.sh /etc/fail2ban/backups/YYYYMMDD-HHMMSS`.
+`update.sh` creates a timestamped backup in `/etc/fail2ban/backups/YYYYMMDD-HHMMSS/` before each deploy (keeps last 10). To restore: `restore-backup.sh` (latest) or `restore-backup.sh /etc/fail2ban/backups/YYYYMMDD-HHMMSS`.
 
 ---
 
@@ -285,7 +285,7 @@ ls /usr/local/apache/domlogs/*/* | head -5
 | Script | Purpose |
 |--------|---------|
 | install.sh | Full install: copy to /usr/share/fail2ban, deploy, IP2Location, logrotate, enable, WHM plugin |
-| setup.sh | Deploy config to /etc/fail2ban (backs up first), restart fail2ban |
+| update.sh | Deploy config to /etc/fail2ban (backs up first), restart fail2ban |
 | restore-backup.sh | Restore from backup (default: latest). Usage: `restore-backup.sh [BACKUP_DIR]` |
 | uninstall.sh | Remove config; --purge = also packages, WHM plugin, /etc and /usr/share |
 | status.sh | Show fail2ban service and jail status |
@@ -299,7 +299,7 @@ All scripts must be run as root.
 
 ### Domlog path differs
 
-Edit jail config: `logpath = /path/to/your/logs/*` then run `setup.sh` or `systemctl restart fail2ban`.
+Edit jail config: `logpath = /path/to/your/logs/*` then run `update.sh` or `systemctl restart fail2ban`.
 
 ### No `fail2ban` binary
 
@@ -314,13 +314,13 @@ Use `fail2ban-client` for management. There is no standalone `fail2ban` command.
 ### IP not being banned
 
 - **Country whitelist:** Check ignore-countries.conf; IPs from listed countries are skipped
-- **IP whitelist:** Check whitelist-ips.conf and run update-whitelist.sh + setup.sh
+- **IP whitelist:** Check whitelist-ips.conf and run update-whitelist.sh + update.sh
 - **Time window:** findtime is a sliding window; requests must exceed maxretry within that window
 - **Test filter:** `fail2ban-regex /path/to/log /etc/fail2ban/filter.d/wordpress-wp-login.conf`
 
 ### High-volume jail caution
 
-The apache-high-volume jail may affect legitimate high-traffic users (API clients, CDNs, mobile apps). To disable: set `enabled = false` in `jail.d/apache-high-volume.conf` and run setup.sh.
+The apache-high-volume jail may affect legitimate high-traffic users (API clients, CDNs, mobile apps). To disable: set `enabled = false` in `jail.d/apache-high-volume.conf` and run update.sh.
 
 ---
 

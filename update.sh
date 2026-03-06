@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Fail2Ban WordPress wp-login - Setup script (config deploy only)
+# Fail2Ban WordPress wp-login - Update script (config deploy only)
 # Use when fail2ban is already installed. Copies config and restarts.
 # Must be run as root
 #
@@ -25,7 +25,7 @@ if ! rpm -q fail2ban-server &>/dev/null; then
 fi
 [ -d "$CONFIG_DIR" ] || { echo "Source not found. Run install.sh first." >&2; exit 1; }
 
-echo "=== Fail2Ban WordPress wp-login - Setup (config deploy) ==="
+echo "=== Fail2Ban WordPress wp-login - Update (config deploy) ==="
 echo
 
 BACKUP_DIR="/etc/fail2ban/backups"
@@ -70,7 +70,7 @@ mkdir -p /etc/fail2ban/scripts
 echo "      Config deployed."
 
 echo "[3/4] Updating WHM plugin..."
-# Use SCRIPT_DIR so running ./setup.sh from source (e.g. /root/fail2ban) deploys latest plugin files
+# Use SCRIPT_DIR so running ./update.sh from source (e.g. /root/fail2ban) deploys latest plugin files
 WHM_PLUGIN_DIR="$SCRIPT_DIR/whm-plugin"
 if [ -x "$WHM_PLUGIN_DIR/install-whm-plugin.sh" ] && [ -f "$WHM_PLUGIN_DIR/plugin/index.php" ]; then
    (cd "$WHM_PLUGIN_DIR" && ./install-whm-plugin.sh) || echo "      WHM plugin install failed."
@@ -102,4 +102,4 @@ echo "      Done."
 echo
 fail2ban-client status
 echo
-echo "=== Setup complete ==="
+echo "=== Update complete ==="

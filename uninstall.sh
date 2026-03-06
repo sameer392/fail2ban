@@ -7,7 +7,7 @@
 
 set -e
 
-# Configs we deploy (must match setup.sh)
+# Configs we deploy (must match update.sh)
 F2B_FILTERS=(
    /etc/fail2ban/filter.d/wordpress-wp-login.conf
    /etc/fail2ban/filter.d/apache-high-volume.conf

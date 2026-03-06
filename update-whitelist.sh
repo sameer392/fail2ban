@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # update-whitelist.sh - Regenerate filter ignoreregex from whitelist-ips.conf
-# Run after editing whitelist-ips.conf, then run ./setup.sh to deploy
+# Run after editing whitelist-ips.conf, then run ./update.sh to deploy
 # Must be run as root (writes to filter.d/)
 #
 
@@ -102,4 +102,4 @@ awk -v ign="$IGN_WP" '
 ' "$CONFIG_DIR/filter.d/wordpress-wp-login.conf" > "$tmp"
 mv "$tmp" "$CONFIG_DIR/filter.d/wordpress-wp-login.conf"
 
-echo "Whitelist updated. Run $INSTALL_DIR/setup.sh to deploy."
+echo "Whitelist updated. Run $INSTALL_DIR/update.sh to deploy."

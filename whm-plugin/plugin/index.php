@@ -501,9 +501,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             if (file_put_contents($conf, $val) !== false) {
                 if (file_exists('/usr/share/fail2ban/update-whitelist.sh')) {
                     exec('/usr/share/fail2ban/update-whitelist.sh 2>&1', $out, $ret);
-                    exec('/usr/share/fail2ban/setup.sh 2>&1', $out2, $ret2);
+                    exec('/usr/share/fail2ban/update.sh 2>&1', $out2, $ret2);
                 }
-                $msg = 'Whitelist IPs saved' . (file_exists('/usr/share/fail2ban/setup.sh') ? ' and deployed.' : '.');
+                $msg = 'Whitelist IPs saved' . (file_exists('/usr/share/fail2ban/update.sh') ? ' and deployed.' : '.');
             } else {
                 $msg = 'Could not write whitelist-ips.conf';
             }
@@ -554,7 +554,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             $msg = 'Could not write useragent-keywords.conf';
         }
     } elseif ($action === 'deploy') {
-        exec('/usr/share/fail2ban/setup.sh 2>&1', $out, $ret);
+        exec('/usr/share/fail2ban/update.sh 2>&1', $out, $ret);
         $msg = $ret === 0 ? 'Config deployed and fail2ban restarted.' : 'Deploy failed: ' . implode("\n", $out);
     } elseif ($action === 'unban') {
         $ip = preg_replace('/[^0-9a-fA-F.:]/', '', $_POST['ip'] ?? '');
@@ -628,7 +628,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             exec($script . ' 2>&1', $out, $ret);
             $msg = $ret === 0 ? 'IP2Location ASN database installed.' : 'Setup failed: ' . implode("\n", $out);
         } else {
-            $msg = 'setup-ip2location-asn.sh not found. Run setup.sh to deploy.';
+            $msg = 'setup-ip2location-asn.sh not found. Run update.sh to deploy.';
         }
     } elseif ($action === 'unban_whitelisted') {
         $unbanned = 0;
@@ -654,7 +654,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             $findtime = (int)($_POST['findtime'] ?? 300);
             $bantime = (int)($_POST['bantime'] ?? 3600);
             if (save_jail_settings($jail, $maxretry, $findtime, $bantime)) {
-                exec('/usr/share/fail2ban/setup.sh 2>&1', $out, $ret);
+                exec('/usr/share/fail2ban/update.sh 2>&1', $out, $ret);
                 $msg = $ret === 0 ? "Jail settings saved and fail2ban restarted." : "Settings saved; deploy failed: " . implode("\n", $out);
             } else {
                 $msg = "Could not write jail config.";
@@ -665,7 +665,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     } elseif ($action === 'save_loglevel') {
         $level = $_POST['loglevel'] ?? 'WARNING';
         if (save_loglevel($level)) {
-            exec('/usr/share/fail2ban/setup.sh 2>&1', $out, $ret);
+            exec('/usr/share/fail2ban/update.sh 2>&1', $out, $ret);
             $msg = $ret === 0 ? "Log level set to $level and fail2ban restarted." : "Log level saved; restart failed: " . implode("\n", $out);
         } else {
             $msg = "Invalid log level.";

@@ -47,7 +47,7 @@ chmod +x "$INSTALL_DIR/scripts"/*.sh 2>/dev/null || true
 [ -f "$BACKUP/whitelist-ips.conf" ] && cp -a "$BACKUP/whitelist-ips.conf" "$INSTALL_DIR/"
 
 echo "Running setup..."
-(cd "$INSTALL_DIR" && ./setup.sh)
+(cd "$INSTALL_DIR" && ./update.sh)
 
 echo "Restoring user configs..."
 [ -f "$BACKUP/ignore-countries.conf" ] && cp -a "$BACKUP/ignore-countries.conf" /etc/fail2ban/scripts/
