@@ -70,10 +70,10 @@ function get_ip_org($ip, &$cache = []) {
             $out = [];
         }
     }
-    // 3. Try local whois (system tool, queries RIRs - no third-party API)
+    // 3. Try local whois (system tool, queries RIRs - no third-party API) - 2s timeout
     if (function_exists('exec')) {
         $out = [];
-        @exec("whois " . escapeshellarg($ip) . " 2>/dev/null", $out, $ret);
+        @exec("timeout 2 whois " . escapeshellarg($ip) . " 2>/dev/null", $out, $ret);
         $text = implode("\n", $out);
         if (preg_match('/^OrgName:\s*(.+)$/m', $text, $m)) $org = trim($m[1]);
         elseif (preg_match('/^Organization:\s*([^(]+)/m', $text, $m)) $org = trim($m[1]);
@@ -163,7 +163,7 @@ function get_affected_domains($ip, $jail, &$cache = []) {
     }
     if ($domains === '' && is_dir('/usr/local/apache/domlogs')) {
         $files = [];
-        exec("grep -lE '^" . preg_quote($ip, '/') . " ' /usr/local/apache/domlogs/*/* 2>/dev/null", $files);
+        @exec("timeout 2 grep -lE '^" . preg_quote($ip, '/') . " ' /usr/local/apache/domlogs/*/* 2>/dev/null", $files);
         $doms = [];
         foreach ($files as $f) {
             $doms[] = preg_replace('/-ssl_log$/', '', basename($f));
@@ -207,22 +207,25 @@ function get_ban_epochs($jail) {
 }
 
 function get_banned_ips_paginated($jail, $page, $per_page, $search, &$total_out) {
-    $d = parse_jail_status($jail);
-    $ips = $d['banned_ips'] ?? [];
-    if (empty($ips)) { $total_out = 0; return []; }
-    $epochs = get_ban_epochs($jail);
+    $db = '/var/lib/fail2ban/fail2ban.sqlite3';
+    if (!file_exists($db) || !is_readable($db)) { $total_out = 0; return []; }
+    $jail_esc = preg_replace('/[^a-zA-Z0-9_-]/', '', $jail);
     $search = trim(preg_replace('/[^0-9a-fA-F.:]/', '', $search));
-    if ($search !== '') {
-        $ips = array_values(array_filter($ips, function($ip) use ($search) { return stripos($ip, $search) !== false; }));
-    }
-    usort($ips, function($a, $b) use ($epochs) {
-        $ea = $epochs[$a] ?? 0;
-        $eb = $epochs[$b] ?? 0;
-        return $eb - $ea;
-    });
-    $total_out = count($ips);
+    $search_sql = ($search !== '') ? " AND ip LIKE '%" . str_replace("'", "''", $search) . "%'" : '';
     $offset = max(0, ($page - 1) * $per_page);
-    return array_slice($ips, $offset, $per_page);
+    $limit = max(1, min(50, (int)$per_page));
+    $out = [];
+    exec("sqlite3 -separator '|' " . escapeshellarg($db) . " \"SELECT COUNT(*) FROM bips WHERE jail='" . $jail_esc . "'" . $search_sql . "\" 2>/dev/null", $cnt_out, $cnt_ret);
+    $total_out = ($cnt_ret === 0 && isset($cnt_out[0])) ? (int)$cnt_out[0] : 0;
+    if ($total_out <= 0) return [];
+    exec("sqlite3 -separator '|' " . escapeshellarg($db) . " \"SELECT ip, datetime(timeofban, 'unixepoch', 'localtime') FROM bips WHERE jail='" . $jail_esc . "'" . $search_sql . " ORDER BY timeofban DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset . "\" 2>/dev/null", $out, $ret);
+    if ($ret !== 0) return [];
+    $rows = [];
+    foreach ($out as $line) {
+        $p = explode('|', $line, 2);
+        if (count($p) >= 2) $rows[] = ['ip' => trim($p[0]), 'banned_at' => trim($p[1])];
+    }
+    return $rows;
 }
 
 function get_bans_last_24h() {
@@ -603,18 +606,18 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'banned_ips' && isset($_GET['jail'
         $domain_cache = [];
         $org_cache = [];
         $form_id = 'bulk-unban-' . $ajail . $fs;
-        $ban_times = get_ban_times($ajail);
         $total_pages = $total > 0 ? (int)ceil($total / $per_page) : 0;
         $container_id = 'banned-ips-' . $ajail . $fs;
         echo '<div class="banned-ips-ajax" data-jail="' . htmlspecialchars($ajail) . '" data-container="' . htmlspecialchars($container_id) . '">';
         echo '<form class="form-inline banned-ip-search" style="margin-bottom:10px;"><input type="text" class="form-control input-sm banned-ip-search-input" placeholder="Search IP..." value="' . htmlspecialchars($search) . '" style="width:180px;"><button type="submit" class="btn btn-default btn-sm" style="margin-left:6px;">Search</button></form>';
         if (!empty($ips)) {
             echo '<table class="table table-bordered table-striped table-condensed banned-ips-table"><thead><tr><th><input type="checkbox" class="select-all-banned" data-jail="' . htmlspecialchars($ajail) . '" data-container="' . htmlspecialchars($container_id) . '" title="Select all"></th><th>#</th><th>IP Address</th><th>Country</th><th>Organization</th><th>Affected Domains</th><th>Banned At</th><th>Action</th></tr></thead><tbody>';
-            foreach ($ips as $i => $ip) {
+            foreach ($ips as $i => $row) {
+                $ip = $row['ip'];
+                $banned_at = $row['banned_at'] ?? '-';
                 $country = get_ip_country($ip, $country_cache);
                 $org = get_ip_org($ip, $org_cache);
                 $affected = get_affected_domains($ip, $ajail, $domain_cache);
-                $banned_at = $ban_times[$ip] ?? '-';
                 $is_whitelisted = in_array($country, $whitelist_countries_arr);
                 $rowClass = $is_whitelisted ? ' class="warning" style="background:var(--accent-01,#fff3cd)"' : '';
                 $wlLabel = $is_whitelisted ? ' <span class="label label-warning">whitelisted</span>' : '';
