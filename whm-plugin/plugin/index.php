@@ -944,7 +944,15 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
     <table class="table table-bordered table-striped table-condensed" style="max-width:500px;">
       <thead><tr><th>Jail</th><th>Currently Banned</th><th>Total Banned</th></tr></thead>
       <tbody>
-      <?php foreach ($jails as $j): $d = $jail_data[$j]; ?>
+      <?php
+      $sum_current = 0;
+      $sum_total = 0;
+      foreach ($jails as $j): $d = $jail_data[$j];
+        $cur = is_numeric($d['currently_banned']) ? (int)$d['currently_banned'] : 0;
+        $tot = is_numeric($d['total_banned']) ? (int)$d['total_banned'] : 0;
+        $sum_current += $cur;
+        $sum_total += $tot;
+      ?>
         <tr>
           <td><?php echo htmlspecialchars($j); ?></td>
           <td><?php echo htmlspecialchars($d['currently_banned']); ?></td>
@@ -952,6 +960,7 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
         </tr>
       <?php endforeach; ?>
       </tbody>
+      <tfoot><tr style="font-weight:bold;background:var(--base-02,#f5f5f5);"><td>Total</td><td><?php echo $sum_current; ?></td><td><?php echo $sum_total; ?></td></tr></tfoot>
     </table>
     <p style="margin-top:12px;"><a href="?tab=banned" class="btn btn-primary btn-sm">Manage Banned IPs</a></p>
   </div>
