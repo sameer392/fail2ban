@@ -358,6 +358,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
         }
     }
     if (isset($tab_from_action[$action])) $current_tab = $tab_from_action[$action];
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('Content-Type: application/json; charset=utf-8');
+        $err = preg_match('/\b(failed|error|could not|invalid)\b/i', $msg);
+        $refresh = in_array($action, ['unban', 'unban_bulk', 'unban_whitelisted']);
+        echo json_encode(['ok' => !$err, 'msg' => $msg, 'tab' => $current_tab, 'refresh_banned' => $refresh]);
+        exit;
+    }
 }
 
 $ignore_conf = '/etc/fail2ban/scripts/ignore-countries.conf';
@@ -466,17 +473,10 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
   <li class="active">Fail2Ban Manager</li>
 </ol>
 
-<?php if ($msg): ?><p class="alert alert-info"><?php echo htmlspecialchars($msg); ?></p><?php endif; ?>
-
+<div id="fail2ban-msg" class="alert alert-info" style="display:<?php echo $msg ? 'block' : 'none'; ?>;"><?php echo $msg ? htmlspecialchars($msg) : ''; ?></div>
 <?php if (!$geoip_ready): ?>
 <p class="alert alert-warning">
   <strong>GeoIP not configured.</strong> Country lookup uses ip-api.com (rate-limited). For better reliability, run <code>/etc/fail2ban/scripts/setup-ip2location.sh</code> as root. Use "Update IP2Location DB" in the Settings tab to refresh after setup.
-</p>
-<?php endif; ?>
-
-<?php if (!empty($whitelist_countries_arr)): ?>
-<p class="alert alert-warning">
-  <strong>Note:</strong> IPs from whitelisted countries (<?php echo htmlspecialchars($ignore_countries); ?>) may appear if they were banned <em>before</em> the whitelist was added. Use "Unban all from whitelisted countries" in the Banned IPs tab to remove them.
 </p>
 <?php endif; ?>
 
@@ -756,6 +756,83 @@ $js = $jail_settings[$j] ?? ['maxretry' => 5, 'findtime' => 300, 'bantime' => 36
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  var base = (window.location.href || '').split('?')[0];
+  var jails = ['wordpress-wp-login', 'apache-high-volume'];
+
+  function showMsg(msg, isErr) {
+    var el = document.getElementById('fail2ban-msg');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'alert alert-' + (isErr ? 'danger' : 'info');
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(function() { el.style.display = 'none'; }, 5000);
+  }
+
+  function refreshBannedIps() {
+    jails.forEach(function(jail) {
+      var container = document.getElementById('banned-ips-' + jail + '-tab');
+      if (!container) return;
+      fetch(base + '?ajax=banned_ips&jail=' + encodeURIComponent(jail) + '&fs=tab', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          if (html && html.length < 50000 && html.indexOf('</html>') === -1) container.innerHTML = html;
+        });
+    });
+  }
+
+  // Tab switching without reload (nav tabs + in-page links like "Manage Banned IPs")
+  document.querySelectorAll('.fail2ban-manager a[href^="?tab="]').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      var m = this.getAttribute('href').match(/tab=(\w+)/);
+      if (!m) return;
+      var tid = m[1];
+      document.querySelectorAll('.fail2ban-manager .nav-tabs li').forEach(function(li) { li.classList.remove('active'); });
+      document.querySelectorAll('.fail2ban-manager .tab-pane').forEach(function(p) { p.classList.remove('active'); });
+      var activeTab = document.querySelector('.fail2ban-manager .nav-tabs a[href="?tab=' + tid + '"]');
+      if (activeTab) activeTab.parentElement.classList.add('active');
+      var pane = document.getElementById('tab-' + tid);
+      if (pane) pane.classList.add('active');
+      history.pushState(null, '', base + '?tab=' + tid);
+    });
+  });
+
+  window.addEventListener('popstate', function() {
+    var m = (window.location.search || '').match(/[?&]tab=(\w+)/);
+    if (m) {
+      var tid = m[1];
+      document.querySelectorAll('.fail2ban-manager .nav-tabs li').forEach(function(li) { li.classList.remove('active'); });
+      document.querySelectorAll('.fail2ban-manager .tab-pane').forEach(function(p) { p.classList.remove('active'); });
+      var at = document.querySelector('.fail2ban-manager .nav-tabs a[href="?tab=' + tid + '"]');
+      if (at) at.parentElement.classList.add('active');
+      var pane = document.getElementById('tab-' + tid);
+      if (pane) pane.classList.add('active');
+    }
+  });
+
+  // AJAX form submission
+  document.querySelectorAll('.fail2ban-manager form').forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) btn.disabled = true;
+      var fd = new FormData(form);
+      fetch(form.action || window.location.href, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json().catch(function() { return { ok: false, msg: 'Invalid response' }; }); })
+        .then(function(data) {
+          showMsg(data.msg || 'Done.', !data.ok);
+          if (data.refresh_banned) refreshBannedIps();
+        })
+        .catch(function() {
+          showMsg('Request failed. Please try again.', true);
+        })
+        .finally(function() {
+          if (btn) btn.disabled = false;
+        });
+    });
+  });
+
   // Time preset dropdowns
   document.querySelectorAll('.findtime-preset').forEach(function(sel) {
     sel.addEventListener('change', function() {
