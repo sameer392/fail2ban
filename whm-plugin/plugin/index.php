@@ -939,7 +939,9 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
   </div>
 </div>
 <div class="panel panel-default">
-  <div class="panel-heading">Jail Summary</div>
+  <div class="panel-heading">Jail Summary
+    <button type="button" class="btn btn-link btn-sm refresh-dashboard" title="Refresh" style="margin-left:6px;"><span class="glyphicon glyphicon-refresh"></span></button>
+  </div>
   <div class="panel-body">
     <table class="table table-bordered table-striped table-condensed" style="max-width:500px;">
       <thead><tr><th>Jail</th><th>Currently Banned</th><th>Total Banned</th></tr></thead>
@@ -1552,6 +1554,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   document.addEventListener('click', function(e) {
+    var refreshDashboard = e.target.closest('.refresh-dashboard');
+    if (refreshDashboard) {
+      e.preventDefault();
+      var icon = refreshDashboard.querySelector('.glyphicon-refresh');
+      if (icon) icon.classList.add('glyphicon-refresh-animate');
+      window.location.reload();
+      return;
+    }
     var cleanBtn = e.target.closest('.clean-expired-bips');
     if (cleanBtn) {
       e.preventDefault();
