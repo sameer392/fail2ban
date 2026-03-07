@@ -10,7 +10,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="/usr/share/fail2ban"
 [ -d "$INSTALL_DIR" ] || INSTALL_DIR="$SCRIPT_DIR"
-CONFIG_DIR="$INSTALL_DIR"
+# When running from repo (e.g. /root/fail2ban), deploy from there so local fixes apply
+if [ "$SCRIPT_DIR" != "$INSTALL_DIR" ] && [ -f "$SCRIPT_DIR/scripts/setup-ip2location-asn.sh" ]; then
+   CONFIG_DIR="$SCRIPT_DIR"
+else
+   CONFIG_DIR="$INSTALL_DIR"
+fi
 
 # Check root
 if [[ $EUID -ne 0 ]]; then
