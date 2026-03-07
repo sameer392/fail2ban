@@ -1,6 +1,23 @@
 # Installation
 
-## Full Installation (fail2ban not yet installed)
+## One-Liner Install (from GitHub)
+
+```bash
+# From latest release (attach install.sh as release asset when creating a release)
+curl -sSL https://github.com/sameer392/fail2ban-whm/releases/latest/download/install.sh | bash
+
+# From main branch (works immediately, no release needed)
+curl -sSL https://raw.githubusercontent.com/sameer392/fail2ban-whm/main/install.sh | bash
+```
+
+Install a specific version (with releases):
+```bash
+curl -sSL https://github.com/sameer392/fail2ban-whm/releases/latest/download/install.sh | bash -s v1.0.0
+```
+
+The bootstrap script downloads the full source archive and runs `scripts/install.sh`.
+
+## Full Installation (from local clone)
 
 ```bash
 cd /root/fail2ban

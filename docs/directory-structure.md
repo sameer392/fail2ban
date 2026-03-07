@@ -2,6 +2,7 @@
 
 ```
 /root/fail2ban/
+├── install.sh              # Bootstrap installer (curl | bash from GitHub)
 ├── logrotate.d/            # Logrotate configs
 │   └── fail2ban            # → /etc/logrotate.d/fail2ban
 ├── README.md
