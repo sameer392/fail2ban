@@ -480,7 +480,7 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 $current_tab = $_GET['tab'] ?? $_POST['tab'] ?? 'dashboard';
 $valid_tabs = ['dashboard' => 'Dashboard', 'banned' => 'Banned IPs', 'whitelists' => 'Whitelists', 'notifications' => 'Notifications', 'settings' => 'Settings', 'update' => 'Update'];
 if (!isset($valid_tabs[$current_tab])) $current_tab = 'dashboard';
-$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_blocklist_organizations' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'update_ip2location' => 'settings', 'save_ip2location_token' => 'settings', 'setup_ip2location_asn' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'settings', 'do_update' => 'update'];
+$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_blocklist_organizations' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'force_redeploy' => 'update', 'update_ip2location' => 'settings', 'save_ip2location_token' => 'settings', 'setup_ip2location_asn' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'settings', 'do_update' => 'update'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     if ($action === 'save_ignore_countries') {
@@ -701,6 +701,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             $msg = $enabled && $email_to ? "Email alerts (SMTP) saved. Alerts will be sent to $email_to." : ($enabled ? "SMTP config saved. Add recipient email and enable." : "Email alerts disabled.");
         } else {
             $msg = "Could not write email-alerts.conf.";
+        }
+    } elseif ($action === 'force_redeploy') {
+        if (file_exists('/usr/share/fail2ban/update.sh')) {
+            exec('/usr/share/fail2ban/update.sh 2>&1', $out, $ret);
+            $msg = $ret === 0 ? 'Config re-deployed and fail2ban restarted.' : 'Re-deploy failed: ' . implode("\n", $out);
+        } else {
+            $msg = 'update.sh not found. Install fail2ban-whm first.';
         }
     } elseif ($action === 'do_update') {
         $tag = preg_replace('/[^a-zA-Z0-9_.-]/', '', $_POST['update_tag'] ?? '');
@@ -1319,6 +1326,11 @@ if (strpos($j, 'apache-ua-') === 0) continue;
     <div id="update-status" class="text-muted" style="margin:10px 0;"></div>
     <div id="update-actions" style="margin-top:12px;">
       <button type="button" class="btn btn-default btn-sm" id="check-update-btn">Check for updates</button>
+      <form method="post" style="display:inline;margin-left:8px;">
+        <input type="hidden" name="action" value="force_redeploy">
+        <input type="hidden" name="tab" value="update">
+        <button type="submit" class="btn btn-default btn-sm" id="force-redeploy-btn">Force re-deploy</button>
+      </form>
       <div id="update-form-wrap" style="display:none;margin-top:12px;">
         <form method="post" id="do-update-form">
           <input type="hidden" name="action" value="do_update">
@@ -1330,6 +1342,7 @@ if (strpos($j, 'apache-ua-') === 0) continue;
       </div>
     </div>
     <p class="text-muted" style="margin-top:15px;font-size:12px;">Your whitelist IPs, ignore countries, and blocklist settings are preserved during update.</p>
+    <p class="text-muted" style="margin-top:8px;font-size:12px;"><strong>Force re-deploy</strong> re-runs <code>update.sh</code> to deploy config and scripts from <code>/usr/share/fail2ban/</code> without downloading. Use when scripts (e.g. csf-ban.sh) need to be re-applied or after manual file changes.</p>
   </div>
 </div>
 </div>
