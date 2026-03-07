@@ -703,11 +703,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             $msg = "Could not write email-alerts.conf.";
         }
     } elseif ($action === 'force_redeploy') {
-        if (file_exists('/usr/share/fail2ban/update.sh')) {
-            exec('/usr/share/fail2ban/update.sh 2>&1', $out, $ret);
+        $update_script = file_exists('/usr/share/fail2ban/update.sh') ? '/usr/share/fail2ban/update.sh'
+            : (file_exists('/root/fail2ban/update.sh') ? '/root/fail2ban/update.sh' : '');
+        if ($update_script) {
+            exec($update_script . ' 2>&1', $out, $ret);
             $msg = $ret === 0 ? 'Config re-deployed and fail2ban restarted.' : 'Re-deploy failed: ' . implode("\n", $out);
         } else {
-            $msg = 'update.sh not found. Install fail2ban-whm first.';
+            $msg = 'update.sh not found in /usr/share/fail2ban/ or /root/fail2ban/. Run install.sh first.';
         }
     } elseif ($action === 'do_update') {
         $tag = preg_replace('/[^a-zA-Z0-9_.-]/', '', $_POST['update_tag'] ?? '');
