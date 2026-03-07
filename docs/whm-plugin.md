@@ -22,6 +22,7 @@ No cPanel restart needed. Refresh WHM if the plugin does not appear.
 | **Banned IPs** | Table with IP, country (GeoIP), banned time; **CSF** button (runs `csf -g` in modal); click IP for log entries (up to 100); Unban; reload icon; **auto-refresh every 60s** when tab is active |
 | **Unban** | Per-IP or "Unban all from whitelisted countries" |
 | **Ignore Countries** | Edit ISO codes; saves to ignore-countries.conf |
+| **Excluded Domains/Users** | Exclude domains or cPanel users from protection |
 | **Whitelist IPs** | Edit whitelist-ips.conf; Save & Deploy runs update-whitelist + update |
 | **Deploy** | Runs update.sh to deploy config and restart fail2ban |
 | **Update** | Check for updates from GitHub; install by tag (e.g. v1.0.1); Force re-deploy runs update.sh without downloading |

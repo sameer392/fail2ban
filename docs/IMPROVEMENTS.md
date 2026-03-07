@@ -12,9 +12,9 @@ To-do items for enhancing usability, reliability, and functionality.
 - **xmlrpc** – Block IPs with 10+ xmlrpc.php requests in findtime (common WordPress abuse)
 - **exploit-probe** – Block common exploit paths (e.g. `_ignition`, path traversal, `.env`, `config.php`)
 
-### 1.2 Per-domain or per-jail enable/disable
-**Current:** Jails are global; all domains are protected.  
-**Improvement:** Allow enabling/disabling jails per domain or per cPanel user via config or UI. Higher complexity; may need filter changes.
+### 1.2 Per-domain or per-jail enable/disable ✓ Done
+**Current:** Jails were global; all domains were protected.  
+**Implemented:** Excluded domains/users config and UI. Domains and cPanel users in `excluded-domains.conf` are excluded from monitoring (apache-high-volume, wordpress-wp-login). WHM → Whitelists → Excluded Domains/Users. Uses `generate-logpath.sh` to build custom logpath.
 
 ### 1.3 Always-ban list (override country whitelist)
 **Current:** Country whitelist applies to all IPs from that country.  
@@ -100,4 +100,4 @@ To-do items for enhancing usability, reliability, and functionality.
 |----------|-------|
 | **High** | XML-RPC jail, healthcheck script, expand backup scope, status.sh include dynamic jails |
 | **Medium** | Changelog, upgrade docs, confirmation dialogs for destructive actions, edit User-Agent jail params in UI |
-| **Low** | Per-domain enable/disable, always-ban list, import/export, ban history DB, find_suspicious_ips integration |
+| **Low** | Always-ban list, import/export, ban history DB, find_suspicious_ips integration |

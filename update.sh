@@ -49,9 +49,10 @@ done
 mkdir -p "$BKP/action.d"
 [ -f /etc/fail2ban/action.d/csf-domain.conf ] && cp -a /etc/fail2ban/action.d/csf-domain.conf "$BKP/action.d/"
 [ -f /etc/fail2ban/fail2ban.d/loglevel-verbose.conf ] && cp -a /etc/fail2ban/fail2ban.d/loglevel-verbose.conf "$BKP/fail2ban.d/"
-for f in csf-ban.sh ignore-countries.conf blocklist-organizations.conf setup-ip2location.sh setup-ip2location-asn.sh update-ip2location.sh; do
+for f in csf-ban.sh ignore-countries.conf blocklist-organizations.conf excluded-domains.conf setup-ip2location.sh setup-ip2location-asn.sh update-ip2location.sh; do
    [ -f "/etc/fail2ban/scripts/$f" ] && cp -a "/etc/fail2ban/scripts/$f" "$BKP/scripts/"
 done
+[ -f /etc/fail2ban/jail.d/99-domlog-logpath.conf ] && cp -a /etc/fail2ban/jail.d/99-domlog-logpath.conf "$BKP/jail.d/" 2>/dev/null || true
 [ -f /etc/logrotate.d/fail2ban ] && cp -a /etc/logrotate.d/fail2ban "$BKP/" 2>/dev/null || true
 echo "      Backup: $BKP"
 # Keep last 10 backups
@@ -87,8 +88,13 @@ mkdir -p /etc/fail2ban/scripts
 [ -f "$CONFIG_DIR/scripts/setup-ip2location-asn.sh" ] && cp -f "$CONFIG_DIR/scripts/setup-ip2location-asn.sh" /etc/fail2ban/scripts/ && chmod +x /etc/fail2ban/scripts/setup-ip2location-asn.sh && chmod +x /etc/fail2ban/scripts/update-ip2location.sh
 [ -f "$CONFIG_DIR/scripts/update-useragent-jails.sh" ] && cp -f "$CONFIG_DIR/scripts/update-useragent-jails.sh" /etc/fail2ban/scripts/ && chmod +x /etc/fail2ban/scripts/update-useragent-jails.sh
 [ -f "$CONFIG_DIR/scripts/update-from-github.sh" ] && cp -f "$CONFIG_DIR/scripts/update-from-github.sh" /etc/fail2ban/scripts/ && chmod +x /etc/fail2ban/scripts/update-from-github.sh
+[ -f "$CONFIG_DIR/scripts/excluded-domains.conf" ] && cp -f "$CONFIG_DIR/scripts/excluded-domains.conf" /etc/fail2ban/scripts/
+[ -f "$CONFIG_DIR/scripts/generate-logpath.sh" ] && cp -f "$CONFIG_DIR/scripts/generate-logpath.sh" /etc/fail2ban/scripts/ && chmod +x /etc/fail2ban/scripts/generate-logpath.sh
 [ -f "$CONFIG_DIR/fail2ban-logrotate" ] && cp -f "$CONFIG_DIR/fail2ban-logrotate" /etc/logrotate.d/fail2ban
 echo "      Config deployed."
+
+echo "[2b/4] Generating logpath (excluded domains)..."
+[ -x /etc/fail2ban/scripts/generate-logpath.sh ] && /etc/fail2ban/scripts/generate-logpath.sh || true
 
 echo "[3/4] Updating WHM plugin..."
 # Use SCRIPT_DIR so running ./update.sh from source (e.g. /root/fail2ban) deploys latest plugin files

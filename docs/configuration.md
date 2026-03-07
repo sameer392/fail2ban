@@ -19,6 +19,7 @@
 | action.d/csf-domain.conf | Custom action: actionban → csf-ban.sh, actionunban → csf -dr |
 | scripts/csf-ban.sh | Adds IP to csf.deny; skips whitelisted countries; resolves affected domains |
 | scripts/ignore-countries.conf | `WHITELIST_COUNTRIES=IN,US` (ISO codes) |
+| scripts/excluded-domains.conf | Domains/users excluded from protection (see Whitelists tab) |
 | fail2ban.d/loglevel-verbose.conf | Loglevel override (INFO or WARNING) |
 | fail2ban-logrotate | → /etc/logrotate.d/fail2ban |
 
@@ -46,6 +47,22 @@ WHITELIST_COUNTRIES=IN,US,GB
 - **IN** = India, **US** = United States, **GB** = United Kingdom
 - Country lookup: IP2Location LITE DB1 → ip-api.com fallback
 - Setup: Run `scripts/setup-ip2location.sh` during install or manually
+
+### Excluded Domains / Users (scripts/excluded-domains.conf)
+
+Domains and cPanel users listed here are **excluded from fail2ban protection**—their logs are not monitored by apache-high-volume or wordpress-wp-login.
+
+```ini
+EXCLUDED_USERS=user1,user2
+EXCLUDED_DOMAINS=example.com,cdn.example.com
+```
+
+- **EXCLUDED_USERS** – cPanel usernames; all their domains are excluded
+- **EXCLUDED_DOMAINS** – Domain names; matches log filename (e.g. `example.com`, `example.com-ssl_log`)
+
+Edit via WHM → Whitelists → Excluded Domains/Users. After saving, run `update.sh` or use "Save & Deploy" in the UI.
+
+---
 
 ### Organization Lookup (for WHM display and blocked-orgs)
 

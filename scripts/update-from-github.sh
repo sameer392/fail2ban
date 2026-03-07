@@ -39,6 +39,7 @@ mkdir -p "$BACKUP"
 [ -f "$INSTALL_DIR/whitelist-ips.conf" ] && cp -a "$INSTALL_DIR/whitelist-ips.conf" "$BACKUP/"
 [ -f /etc/fail2ban/scripts/ignore-countries.conf ] && cp -a /etc/fail2ban/scripts/ignore-countries.conf "$BACKUP/"
 [ -f /etc/fail2ban/scripts/blocklist-organizations.conf ] && cp -a /etc/fail2ban/scripts/blocklist-organizations.conf "$BACKUP/" 2>/dev/null || true
+[ -f /etc/fail2ban/scripts/excluded-domains.conf ] && cp -a /etc/fail2ban/scripts/excluded-domains.conf "$BACKUP/" 2>/dev/null || true
 [ -f /etc/fail2ban/scripts/email-alerts.conf ] && cp -a /etc/fail2ban/scripts/email-alerts.conf "$BACKUP/" 2>/dev/null || true
 
 echo "Installing files..."
@@ -53,6 +54,7 @@ echo "Running setup..."
 echo "Restoring user configs..."
 [ -f "$BACKUP/ignore-countries.conf" ] && cp -a "$BACKUP/ignore-countries.conf" /etc/fail2ban/scripts/
 [ -f "$BACKUP/blocklist-organizations.conf" ] && cp -a "$BACKUP/blocklist-organizations.conf" /etc/fail2ban/scripts/ 2>/dev/null || true
+[ -f "$BACKUP/excluded-domains.conf" ] && cp -a "$BACKUP/excluded-domains.conf" /etc/fail2ban/scripts/ 2>/dev/null || true
 [ -f "$BACKUP/email-alerts.conf" ] && cp -a "$BACKUP/email-alerts.conf" /etc/fail2ban/scripts/ 2>/dev/null || true
 
 echo "Installing WHM plugin..."

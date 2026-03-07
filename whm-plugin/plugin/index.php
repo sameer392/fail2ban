@@ -480,7 +480,7 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 $current_tab = $_GET['tab'] ?? $_POST['tab'] ?? 'dashboard';
 $valid_tabs = ['dashboard' => 'Dashboard', 'banned' => 'Banned IPs', 'whitelists' => 'Whitelists', 'notifications' => 'Notifications', 'settings' => 'Settings', 'update' => 'Update'];
 if (!isset($valid_tabs[$current_tab])) $current_tab = 'dashboard';
-$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_blocklist_organizations' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'force_redeploy' => 'update', 'update_ip2location' => 'settings', 'save_ip2location_token' => 'settings', 'setup_ip2location_asn' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'settings', 'do_update' => 'update'];
+$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_blocklist_organizations' => 'whitelists', 'save_excluded_domains' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'force_redeploy' => 'update', 'update_ip2location' => 'settings', 'save_ip2location_token' => 'settings', 'setup_ip2location_asn' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'settings', 'do_update' => 'update'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     if ($action === 'save_ignore_countries') {
@@ -524,6 +524,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $msg = 'Blocklist and multi-domain threshold saved.';
             } else {
                 $msg = 'Could not write blocklist-organizations.conf';
+            }
+        } else {
+            $msg = 'Could not write to /etc/fail2ban/scripts/';
+        }
+    } elseif ($action === 'save_excluded_domains') {
+        $conf = '/etc/fail2ban/scripts/excluded-domains.conf';
+        $users = trim(preg_replace('/[^a-zA-Z0-9_,\s.-]/', '', $_POST['excluded_users'] ?? ''));
+        $domains = trim(preg_replace('/[^a-zA-Z0-9_,\s.-]/', '', $_POST['excluded_domains'] ?? ''));
+        $users = preg_replace('/[\s,]+/', ',', $users);
+        $domains = preg_replace('/[\s,]+/', ',', $domains);
+        $content = "# Domains and cPanel users to exclude from fail2ban protection\n";
+        $content .= "# EXCLUDED_USERS - cPanel usernames (comma-separated)\n";
+        $content .= "# EXCLUDED_DOMAINS - Domain names (comma-separated)\n\n";
+        $content .= "EXCLUDED_USERS=$users\nEXCLUDED_DOMAINS=$domains\n";
+        $dir = dirname($conf);
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        if ((file_exists($conf) && is_writable($conf)) || (!file_exists($conf) && is_dir($dir) && is_writable($dir))) {
+            if (file_put_contents($conf, $content) !== false) {
+                $ok = true;
+                if (is_executable('/etc/fail2ban/scripts/generate-logpath.sh')) {
+                    exec('/etc/fail2ban/scripts/generate-logpath.sh 2>&1', $out, $r);
+                    $ok = ($r === 0);
+                }
+                if ($ok) {
+                    exec('fail2ban-client reload 2>&1', $out2, $ret);
+                    $msg = $ret === 0 ? 'Excluded domains saved and fail2ban reloaded.' : 'Saved; reload failed: ' . implode("\n", $out2);
+                } else {
+                    $msg = 'Excluded domains saved; run update.sh to apply.';
+                }
+            } else {
+                $msg = 'Could not write excluded-domains.conf';
             }
         } else {
             $msg = 'Could not write to /etc/fail2ban/scripts/';
@@ -758,6 +789,14 @@ $ip2location_token = '';
 if (file_exists($ip2location_conf) && is_readable($ip2location_conf)) {
     $ic = file_get_contents($ip2location_conf);
     if (preg_match('/IP2LOCATION_TOKEN=(.+)$/m', $ic, $m)) $ip2location_token = trim($m[1]);
+}
+$excluded_conf = '/etc/fail2ban/scripts/excluded-domains.conf';
+$excluded_users = '';
+$excluded_domains = '';
+if (file_exists($excluded_conf) && is_readable($excluded_conf)) {
+    $ec = file_get_contents($excluded_conf);
+    if (preg_match('/EXCLUDED_USERS=(.*)$/m', $ec, $m)) $excluded_users = trim($m[1]);
+    if (preg_match('/EXCLUDED_DOMAINS=(.*)$/m', $ec, $m)) $excluded_domains = trim($m[1]);
 }
 $blocklist_conf = '/etc/fail2ban/scripts/blocklist-organizations.conf';
 $blocked_organizations = '';
@@ -1158,7 +1197,28 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
   </div>
 </div>
 <div class="row" style="margin-top:15px;">
-  <div class="col-md-12">
+  <div class="col-md-6">
+    <div class="panel panel-default">
+      <div class="panel-heading">Excluded Domains / Users</div>
+      <div class="panel-body">
+        <p class="text-muted">Domains and cPanel users excluded from protection. Their logs are not monitored.</p>
+        <form method="post">
+          <input type="hidden" name="action" value="save_excluded_domains">
+          <input type="hidden" name="tab" value="whitelists">
+          <div class="form-group">
+            <label>Excluded cPanel users (comma-separated)</label>
+            <input type="text" name="excluded_users" value="<?php echo htmlspecialchars($excluded_users); ?>" class="form-control" placeholder="user1,user2">
+          </div>
+          <div class="form-group">
+            <label>Excluded domains (comma-separated)</label>
+            <input type="text" name="excluded_domains" value="<?php echo htmlspecialchars($excluded_domains); ?>" class="form-control" placeholder="example.com,cdn.example.com">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Save &amp; Deploy</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
     <div class="panel panel-default">
       <div class="panel-heading">Blocked Organizations &amp; Multi-Domain Abuse</div>
       <div class="panel-body">
