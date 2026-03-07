@@ -21,12 +21,12 @@ if [ -n "$BLACKLIST_COUNTRIES" ]; then
     VALUE=$(echo "$BLACKLIST_COUNTRIES" | tr ',' '\n' | sed 's/[^A-Za-z]//g' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//')
 fi
 
-# Update csf.conf - match CC_DENY line (with or without quotes)
-if grep -q '^CC_DENY' "$CSF_CONF" 2>/dev/null; then
+# Update csf.conf - match only CC_DENY (not CC_DENY_PORTS, CC_DENY_PORTS_TCP, etc.)
+if grep -q '^CC_DENY = ' "$CSF_CONF" 2>/dev/null; then
     if [ -n "$VALUE" ]; then
-        sed -i "s|^CC_DENY.*|CC_DENY = \"$VALUE\"|" "$CSF_CONF"
+        sed -i "s|^CC_DENY = .*|CC_DENY = \"$VALUE\"|" "$CSF_CONF"
     else
-        sed -i "s|^CC_DENY.*|CC_DENY = \"\"|" "$CSF_CONF"
+        sed -i "s|^CC_DENY = .*|CC_DENY = \"\"|" "$CSF_CONF"
     fi
     csf -r &>/dev/null || true
     echo "CSF CC_DENY updated. Countries blocked: ${VALUE:-none}"
