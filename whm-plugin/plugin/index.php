@@ -811,7 +811,7 @@ foreach ($jails as $j) {
     $jail_settings[$j] = get_jail_settings($j);
 }
 
-// AJAX: get log details for banned IP from bips.data
+// AJAX: get log details for banned IP from bips.data (with domlog fallback when fewer matches than failures)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'ip_log_details' && isset($_GET['ip']) && isset($_GET['jail'])) {
     header('Content-Type: application/json; charset=utf-8');
     $ip = preg_replace('/[^0-9a-fA-F.:]/', '', $_GET['ip']);
@@ -830,6 +830,16 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ip_log_details' && isset($_GET['i
                     $matches = $data['matches'] ?? [];
                     $failures = (int)($data['failures'] ?? 0);
                 }
+            }
+        }
+        // Fallback: fail2ban stores only dbmaxmatches (default 5) per ban; grep domlogs for full count
+        $need = max(0, min($failures, 100));
+        if ($need > 0 && count($matches) < $need && is_dir('/usr/local/apache/domlogs')) {
+            $pattern = '^' . preg_quote($ip, '/') . ' ';
+            $domlog_matches = [];
+            @exec("timeout 8 grep -hE " . escapeshellarg($pattern) . " /usr/local/apache/domlogs/*/* 2>/dev/null | tail -" . (int)$need, $domlog_matches, $gr);
+            if (!empty($domlog_matches)) {
+                $matches = $domlog_matches;
             }
         }
     }
