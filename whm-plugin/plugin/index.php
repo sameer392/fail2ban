@@ -478,9 +478,9 @@ if (!checkacl('all')) {
 $msg = '';
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 $current_tab = $_GET['tab'] ?? $_POST['tab'] ?? 'dashboard';
-$valid_tabs = ['dashboard' => 'Dashboard', 'banned' => 'Banned IPs', 'whitelists' => 'Whitelists', 'notifications' => 'Notifications', 'settings' => 'Settings', 'update' => 'Update'];
+$valid_tabs = ['dashboard' => 'Dashboard', 'banned' => 'Banned IPs', 'whitelists' => 'Whitelists', 'blacklist' => 'Blacklist', 'notifications' => 'Notifications', 'settings' => 'Settings', 'update' => 'Update'];
 if (!isset($valid_tabs[$current_tab])) $current_tab = 'dashboard';
-$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_blocklist_organizations' => 'whitelists', 'save_excluded_domains' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'force_redeploy' => 'update', 'update_ip2location' => 'settings', 'save_ip2location_token' => 'settings', 'setup_ip2location_asn' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'settings', 'do_update' => 'update'];
+$tab_from_action = ['save_ignore_countries' => 'whitelists', 'save_whitelist_ips' => 'whitelists', 'save_blocklist_organizations' => 'blacklist', 'save_excluded_domains' => 'whitelists', 'save_email_alerts' => 'notifications', 'save_loglevel' => 'settings', 'deploy' => 'settings', 'force_redeploy' => 'update', 'update_ip2location' => 'settings', 'save_ip2location_token' => 'settings', 'setup_ip2location_asn' => 'settings', 'unban' => 'banned', 'unban_bulk' => 'banned', 'unban_whitelisted' => 'banned', 'save_jail_settings' => 'settings', 'do_update' => 'update'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     if ($action === 'save_ignore_countries') {
@@ -1197,8 +1197,8 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
   </div>
 </div>
 <div class="row" style="margin-top:15px;">
-  <div class="col-md-6">
-    <div class="panel panel-default">
+  <div class="col-md-12">
+    <div class="panel panel-default" style="max-width:600px;">
       <div class="panel-heading">Excluded Domains / Users</div>
       <div class="panel-body">
         <p class="text-muted">Domains and cPanel users excluded from protection. Their logs are not monitored.</p>
@@ -1218,27 +1218,29 @@ if ($home_url === '//' || $home_url === './') $home_url = '../../';
       </div>
     </div>
   </div>
-  <div class="col-md-6">
-    <div class="panel panel-default">
-      <div class="panel-heading">Blocked Organizations &amp; Multi-Domain Abuse</div>
-      <div class="panel-body">
-        <p class="text-muted">IPs from blocked orgs (e.g. Microsoft, DigitalOcean) are always banned, even from whitelisted countries. If an IP from a whitelisted country hits many domains in short time, it is also banned.</p>
-        <form method="post">
-          <input type="hidden" name="action" value="save_blocklist_organizations">
-          <input type="hidden" name="tab" value="whitelists">
-          <div class="form-group">
-            <label>Blocked organizations (comma-separated)</label>
-            <input type="text" name="blocked_organizations" value="<?php echo htmlspecialchars($blocked_organizations); ?>" class="form-control" placeholder="Microsoft, DigitalOcean, Amazon" style="max-width:500px;">
-          </div>
-          <div class="form-group">
-            <label>Multi-domain abuse threshold</label>
-            <input type="number" name="multi_domain_threshold" value="<?php echo (int)$multi_domain_threshold; ?>" min="0" max="20" class="form-control" style="width:80px;" title="Ban whitelisted-country IPs that hit this many domains">
-            <span class="text-muted" style="margin-left:8px;">(0 = disabled)</span>
-          </div>
-          <button type="submit" class="btn btn-primary btn-sm">Save</button>
-        </form>
+</div>
+</div>
+
+<!-- Tab: Blacklist -->
+<div role="tabpanel" class="tab-pane <?php echo $current_tab === 'blacklist' ? 'active' : ''; ?>" id="tab-blacklist">
+<div class="panel panel-default" style="max-width:600px;">
+  <div class="panel-heading">Blocked Organizations &amp; Multi-Domain Abuse</div>
+  <div class="panel-body">
+    <p class="text-muted">IPs from blocked orgs (e.g. Microsoft, DigitalOcean) are always banned, even from whitelisted countries. If an IP from a whitelisted country hits many domains in short time, it is also banned.</p>
+    <form method="post">
+      <input type="hidden" name="action" value="save_blocklist_organizations">
+      <input type="hidden" name="tab" value="blacklist">
+      <div class="form-group">
+        <label>Blocked organizations (comma-separated)</label>
+        <input type="text" name="blocked_organizations" value="<?php echo htmlspecialchars($blocked_organizations); ?>" class="form-control" placeholder="Microsoft, DigitalOcean, Amazon" style="max-width:500px;">
       </div>
-    </div>
+      <div class="form-group">
+        <label>Multi-domain abuse threshold</label>
+        <input type="number" name="multi_domain_threshold" value="<?php echo (int)$multi_domain_threshold; ?>" min="0" max="20" class="form-control" style="width:80px;" title="Ban whitelisted-country IPs that hit this many domains">
+        <span class="text-muted" style="margin-left:8px;">(0 = disabled)</span>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+    </form>
   </div>
 </div>
 </div>
